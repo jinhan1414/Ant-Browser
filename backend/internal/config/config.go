@@ -10,44 +10,9 @@ import (
 )
 
 const (
-	DefaultMaxProfileLimit          = 20
-	StandardCDKeyProfileBonus       = 10
-	GithubStarRewardKey             = "GITHUB_STAR_REWARD"
-	GithubStarProfileBonus          = 50
-	GithubStarProfileTotal          = DefaultMaxProfileLimit + GithubStarProfileBonus
 	DefaultLaunchServerPort         = 19876
 	DefaultLaunchServerAPIKeyHeader = "X-Ant-Api-Key"
 )
-
-// RewardForUsedKey 返回指定兑换记录对应的永久额度奖励。
-func RewardForUsedKey(key string) int {
-	normalized := strings.ToUpper(strings.TrimSpace(key))
-	if normalized == "" {
-		return 0
-	}
-	if normalized == GithubStarRewardKey {
-		return GithubStarProfileBonus
-	}
-	return StandardCDKeyProfileBonus
-}
-
-// MinimumProfileLimitForUsedKeys 根据兑换记录计算最低应得实例额度。
-func MinimumProfileLimitForUsedKeys(keys []string) int {
-	limit := DefaultMaxProfileLimit
-	seen := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		normalized := strings.ToUpper(strings.TrimSpace(key))
-		if normalized == "" {
-			continue
-		}
-		if _, exists := seen[normalized]; exists {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		limit += RewardForUsedKey(normalized)
-	}
-	return limit
-}
 
 // LaunchServerConfig Launch HTTP 服务配置
 type LaunchServerConfig struct {
@@ -87,10 +52,8 @@ type SQLiteConfig struct {
 
 // AppConfig 应用配置
 type AppConfig struct {
-	Name            string       `yaml:"name"`
-	Window          WindowConfig `yaml:"window"`
-	MaxProfileLimit int          `yaml:"max_profile_limit"`
-	UsedCDKeys      []string     `yaml:"used_cd_keys"`
+	Name   string       `yaml:"name"`
+	Window WindowConfig `yaml:"window"`
 }
 
 // WindowConfig 窗口配置
@@ -274,16 +237,6 @@ func normalizeConfig(config *Config) {
 	if config.App.Window.MinHeight <= 0 {
 		config.App.Window.MinHeight = defaultConfig.App.Window.MinHeight
 	}
-	if config.App.UsedCDKeys == nil {
-		config.App.UsedCDKeys = []string{}
-	}
-
-	// 兼容老版本/损坏配置：若 max_profile_limit 缺失或被写成过小值，
-	// 通过兑换记录重新计算最低应得额度，避免基础额度或奖励额度丢失。
-	expectedLimit := MinimumProfileLimitForUsedKeys(config.App.UsedCDKeys)
-	if config.App.MaxProfileLimit < expectedLimit {
-		config.App.MaxProfileLimit = expectedLimit
-	}
 
 	if config.Runtime.MaxMemoryMB <= 0 {
 		config.Runtime.MaxMemoryMB = defaultConfig.Runtime.MaxMemoryMB
@@ -397,8 +350,6 @@ func DefaultConfig() *Config {
 				MinWidth:  1200,
 				MinHeight: 700,
 			},
-			MaxProfileLimit: DefaultMaxProfileLimit,
-			UsedCDKeys:      []string{},
 		},
 		Runtime: RuntimeConfig{
 			MaxMemoryMB: 0,   // 默认禁用软限制，避免把运行中的前后端直接顶死

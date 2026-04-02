@@ -43,8 +43,7 @@ param(
         "build/bin",
         ".vscode",
         ".history",
-        ".kiro",
-        ".ant-license.json"
+        ".kiro"
     ),
 
     [switch]$PublishRelease,

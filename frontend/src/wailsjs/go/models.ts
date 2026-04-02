@@ -26,22 +26,6 @@ export namespace backend {
 	        this.sameSite = source["sameSite"];
 	    }
 	}
-	export class LicenseStatus {
-	    maxLimit: number;
-	    usedCount: number;
-	    usedKeys: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new LicenseStatus(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.maxLimit = source["maxLimit"];
-	        this.usedCount = source["usedCount"];
-	        this.usedKeys = source["usedKeys"];
-	    }
-	}
 	export class ProxyIPHealthResult {
 	    proxyId: string;
 	    ok: boolean;

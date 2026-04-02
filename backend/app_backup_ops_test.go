@@ -18,8 +18,6 @@ func TestBackupEnsureZipSuffix(t *testing.T) {
 
 func TestBackupMergeConfigDedup(t *testing.T) {
 	current := config.DefaultConfig()
-	current.App.MaxProfileLimit = 12
-	current.App.UsedCDKeys = []string{"A1", "B2"}
 	current.Browser.DefaultBookmarks = []config.BrowserBookmark{
 		{Name: "Google", URL: "https://www.google.com/"},
 	}
@@ -34,7 +32,6 @@ func TestBackupMergeConfigDedup(t *testing.T) {
 	}
 
 	incoming := config.DefaultConfig()
-	incoming.App.UsedCDKeys = []string{"b2", "C3"}
 	incoming.Browser.DefaultBookmarks = []config.BrowserBookmark{
 		{Name: "Google Dup", URL: "https://www.google.com/"},
 		{Name: "ChatGPT", URL: "https://chatgpt.com/"},
@@ -57,11 +54,8 @@ func TestBackupMergeConfigDedup(t *testing.T) {
 		t.Fatalf("merged 为空")
 	}
 
-	if merged.App.MaxProfileLimit != 12 {
-		t.Fatalf("license limit 不应被导入配置改写: got=%d", merged.App.MaxProfileLimit)
-	}
-	if len(merged.App.UsedCDKeys) != 2 {
-		t.Fatalf("used cd keys 不应被导入配置改写: %+v", merged.App.UsedCDKeys)
+	if merged.App.Name != current.App.Name {
+		t.Fatalf("App.Name 不应被导入配置改写: got=%q", merged.App.Name)
 	}
 	if len(merged.Browser.DefaultBookmarks) != 2 {
 		t.Fatalf("bookmarks 判重失败: %+v", merged.Browser.DefaultBookmarks)

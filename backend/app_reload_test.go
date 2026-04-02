@@ -2,8 +2,12 @@ package backend
 
 import (
 	"ant-chrome/backend/internal/config"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestReloadConfigLoadsFromDisk(t *testing.T) {
@@ -30,17 +34,14 @@ func TestReloadConfigLoadsFromDisk(t *testing.T) {
 	}
 }
 
-func TestReloadConfigKeepsLocalLicenseState(t *testing.T) {
+func TestReloadConfigRemovesLegacyLicenseStateFile(t *testing.T) {
 	root := t.TempDir()
 
 	cfg := config.DefaultConfig()
 	if err := cfg.Save(filepath.Join(root, "config.yaml")); err != nil {
 		t.Fatalf("写入测试配置失败: %v", err)
 	}
-	if err := saveLocalLicenseState(filepath.Join(root, "config.yaml"), &localLicenseState{
-		MaxProfileLimit: config.GithubStarProfileTotal + config.StandardCDKeyProfileBonus,
-		UsedCDKeys:      []string{"ANT-AAAA-BBBB-CCCC-DDDD-EEEEEEEE", "GITHUB_STAR_REWARD"},
-	}); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".ant-license.json"), []byte(`{"maxProfileLimit":999,"usedCdKeys":["A1"]}`), 0o644); err != nil {
 		t.Fatalf("写入本机额度状态失败: %v", err)
 	}
 
@@ -51,10 +52,43 @@ func TestReloadConfigKeepsLocalLicenseState(t *testing.T) {
 		t.Fatalf("ReloadConfig 失败: %v", err)
 	}
 
-	if app.config.App.MaxProfileLimit != config.GithubStarProfileTotal+config.StandardCDKeyProfileBonus {
-		t.Fatalf("ReloadConfig 未恢复本机额度状态: got=%d", app.config.App.MaxProfileLimit)
+	if _, err := os.Stat(filepath.Join(root, ".ant-license.json")); !os.IsNotExist(err) {
+		t.Fatalf("ReloadConfig 应删除旧额度状态文件: err=%v", err)
 	}
-	if len(app.config.App.UsedCDKeys) != 2 {
-		t.Fatalf("ReloadConfig 未恢复兑换记录: %+v", app.config.App.UsedCDKeys)
+}
+
+func TestReloadConfigDoesNotExposeLegacyQuotaFields(t *testing.T) {
+	root := t.TempDir()
+
+	cfg := config.DefaultConfig()
+	cfg.App.Name = "No-License-State"
+	if err := cfg.Save(filepath.Join(root, "config.yaml")); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+	stateJSON := `{"maxProfileLimit":999,"usedCdKeys":["GITHUB_STAR_REWARD","ANT-AAAA-BBBB-CCCC-DDDD-EEEEEEEE"]}`
+	if err := os.WriteFile(filepath.Join(root, ".ant-license.json"), []byte(stateJSON), 0o644); err != nil {
+		t.Fatalf("写入旧额度状态失败: %v", err)
+	}
+
+	app := NewApp(root)
+	app.config = config.DefaultConfig()
+
+	if err := app.ReloadConfig(); err != nil {
+		t.Fatalf("ReloadConfig 失败: %v", err)
+	}
+
+	data, err := yaml.Marshal(app.config)
+	if err != nil {
+		t.Fatalf("序列化配置失败: %v", err)
+	}
+	text := string(data)
+	if strings.Contains(text, "max_profile_limit:") {
+		t.Fatalf("ReloadConfig 后配置不应暴露 max_profile_limit: %s", text)
+	}
+	if strings.Contains(text, "used_cd_keys:") {
+		t.Fatalf("ReloadConfig 后配置不应暴露 used_cd_keys: %s", text)
+	}
+	if app.config.App.Name != "No-License-State" {
+		t.Fatalf("ReloadConfig 不应影响正常配置字段: got=%q", app.config.App.Name)
 	}
 }

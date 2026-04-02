@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -35,9 +36,6 @@ browser: {}
 	}
 	if cfg.App.Name != "Ant Browser" {
 		t.Fatalf("App.Name 未补齐: got=%q", cfg.App.Name)
-	}
-	if cfg.App.MaxProfileLimit != GithubStarProfileTotal {
-		t.Fatalf("MaxProfileLimit 计算错误: got=%d want=%d", cfg.App.MaxProfileLimit, GithubStarProfileTotal)
 	}
 	if cfg.Runtime.MaxMemoryMB != 0 || cfg.Runtime.GCPercent != 100 {
 		t.Fatalf("Runtime 未补齐: got=%+v", cfg.Runtime)
@@ -91,8 +89,6 @@ app:
     height: 800
     min_width: 900
     min_height: 600
-  max_profile_limit: 20
-  used_cd_keys: []
 runtime:
   max_memory_mb: 2048
   gc_percent: 80
@@ -142,7 +138,7 @@ launch_server:
 		t.Fatalf("加载配置失败: %v", err)
 	}
 
-	if cfg.App.Name != "Custom App" || cfg.App.MaxProfileLimit != 20 {
+	if cfg.App.Name != "Custom App" {
 		t.Fatalf("App 显式配置被覆盖: got=%+v", cfg.App)
 	}
 	if cfg.Database.SQLite.Path != "custom/app.db" {
@@ -197,5 +193,47 @@ logging:
 
 	if cfg.Logging.FilePath != "data/logs/app.log" {
 		t.Fatalf("legacy 根目录日志路径未迁移: got=%q", cfg.Logging.FilePath)
+	}
+}
+
+func TestSaveDropsLegacyQuotaFields(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "config.yaml")
+	legacyConfig := `
+app:
+  name: Legacy App
+  max_profile_limit: 70
+  used_cd_keys:
+    - GITHUB_STAR_REWARD
+logging: {}
+browser: {}
+`
+	if err := os.WriteFile(configPath, []byte(legacyConfig), 0o644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if err := cfg.Save(configPath); err != nil {
+		t.Fatalf("保存配置失败: %v", err)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("读取保存后配置失败: %v", err)
+	}
+	text := string(data)
+	if strings.Contains(text, "max_profile_limit:") {
+		t.Fatalf("保存后的配置不应再包含 max_profile_limit: %s", text)
+	}
+	if strings.Contains(text, "used_cd_keys:") {
+		t.Fatalf("保存后的配置不应再包含 used_cd_keys: %s", text)
+	}
+	if !strings.Contains(text, "name: Legacy App") {
+		t.Fatalf("保存后的配置丢失 App.Name: %s", text)
 	}
 }

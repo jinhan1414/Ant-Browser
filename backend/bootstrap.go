@@ -14,18 +14,9 @@ type TrayCallbacks = apptray.Callbacks
 
 func LoadConfig(path string) (*Config, error) {
 	cfg, err := appconfig.Load(path)
-	configChanged := false
-	repairedConfig := false
 	if err == nil {
-		if changed, _, syncErr := reconcileConfigWithLocalLicense(path, cfg); syncErr != nil {
-			return cfg, syncErr
-		} else {
-			configChanged = changed
-		}
-		if configChanged {
-			if saveErr := cfg.Save(path); saveErr != nil {
-				return cfg, fmt.Errorf("写回配置失败: %w", saveErr)
-			}
+		if cleanupErr := removeLegacyLicenseState(path); cleanupErr != nil {
+			return cfg, cleanupErr
 		}
 		return cfg, nil
 	}
@@ -39,19 +30,14 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	defaultCfg := appconfig.DefaultConfig()
-	repairedConfig = true
-	if changed, _, syncErr := reconcileConfigWithLocalLicense(path, defaultCfg); syncErr != nil {
-		return defaultCfg, syncErr
-	} else {
-		configChanged = changed
+	if err := removeLegacyLicenseState(path); err != nil {
+		return defaultCfg, err
 	}
-	if repairedConfig || configChanged {
-		if saveErr := os.MkdirAll(filepath.Dir(path), 0755); saveErr != nil {
-			return defaultCfg, fmt.Errorf("加载配置失败: %w；创建配置目录失败: %v", err, saveErr)
-		}
-		if saveErr := defaultCfg.Save(path); saveErr != nil {
-			return defaultCfg, fmt.Errorf("加载配置失败: %w；重建默认配置失败: %v", err, saveErr)
-		}
+	if saveErr := os.MkdirAll(filepath.Dir(path), 0755); saveErr != nil {
+		return defaultCfg, fmt.Errorf("加载配置失败: %w；创建配置目录失败: %v", err, saveErr)
+	}
+	if saveErr := defaultCfg.Save(path); saveErr != nil {
+		return defaultCfg, fmt.Errorf("加载配置失败: %w；重建默认配置失败: %v", err, saveErr)
 	}
 	return defaultCfg, nil
 }
