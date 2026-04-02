@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { FolderOpen, Settings, Edit2 } from 'lucide-react'
-import { Badge, Button, Card, ConfirmModal, FormItem, Input, Modal, Table, Textarea, toast } from '../../../shared/components'
+import { Badge, Button, Card, ConfirmModal, FormItem, Input, Modal, Select, Table, Textarea, toast } from '../../../shared/components'
 import type { TableColumn } from '../../../shared/components/Table'
 import type { BrowserCore, BrowserCoreInput, BrowserCoreValidateResult, BrowserSettings, BrowserCoreExtended, BrowserProxy } from '../types'
 import { fetchBrowserCores, saveBrowserCore, deleteBrowserCore, setDefaultBrowserCore, validateBrowserCorePath, openCorePath, fetchBrowserSettings, saveBrowserSettings, fetchCoreExtendedInfo, scanBrowserCores, BrowserCoreDownload, fetchBrowserProxies } from '../api'
+import { fetchFingerprintChromiumReleaseOptions, type CoreReleaseOption } from '../coreReleaseOptions'
 import { EventsOn, EventsOff, BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 
 interface CoreDisplayInfo {
@@ -15,6 +16,14 @@ interface CoreDisplayInfo {
   pathMessage: string
   chromeVersion: string
   instanceCount: number
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 export function CoreManagementPage() {
@@ -60,6 +69,11 @@ export function CoreManagementPage() {
   const [downloadForm, setDownloadForm] = useState({ name: '', url: '', proxyMode: 'system', proxyId: '' })
   const [downloadProgress, setDownloadProgress] = useState<{ phase: string; progress: number; message: string } | null>(null)
   const [proxies, setProxies] = useState<BrowserProxy[]>([])
+  const [releaseOptions, setReleaseOptions] = useState<CoreReleaseOption[]>([])
+  const [selectedRelease, setSelectedRelease] = useState('')
+  const [releasesLoading, setReleasesLoading] = useState(false)
+  const [releasesError, setReleasesError] = useState('')
+  const downloadFormDirtyRef = useRef(false)
 
   useEffect(() => {
     loadData()
@@ -85,6 +99,43 @@ export function CoreManagementPage() {
       EventsOff('download:progress')
     }
   }, [])
+
+  const applyReleaseOption = useCallback((option: CoreReleaseOption) => {
+    setSelectedRelease(option.value)
+    setDownloadForm(prev => ({
+      ...prev,
+      name: option.suggestedCoreName,
+      url: option.url,
+    }))
+  }, [])
+
+  const loadReleaseOptions = useCallback(async (signal?: AbortSignal) => {
+    setReleasesLoading(true)
+    setReleasesError('')
+    try {
+      const options = await fetchFingerprintChromiumReleaseOptions(signal)
+      setReleaseOptions(options)
+      if (!downloadFormDirtyRef.current && options.length > 0) {
+        applyReleaseOption(options[0])
+      }
+    } catch (error) {
+      if (isAbortError(error)) return
+      const message = getErrorMessage(error, '加载 fingerprint-chromium 版本列表失败')
+      setReleaseOptions([])
+      setSelectedRelease('')
+      setReleasesError(message)
+      toast.error(message)
+    } finally {
+      setReleasesLoading(false)
+    }
+  }, [applyReleaseOption])
+
+  useEffect(() => {
+    if (!downloadModalOpen) return
+    const controller = new AbortController()
+    void loadReleaseOptions(controller.signal)
+    return () => controller.abort()
+  }, [downloadModalOpen, loadReleaseOptions])
 
   const loadData = async () => {
     setLoading(true)
@@ -240,6 +291,16 @@ export function CoreManagementPage() {
     setEditModalOpen(true)
   }
 
+  const handleOpenDownloadModal = () => {
+    downloadFormDirtyRef.current = false
+    setSelectedRelease('')
+    setReleasesError('')
+    setReleaseOptions([])
+    setDownloadProgress(null)
+    setDownloadForm({ name: '', url: '', proxyMode: 'system', proxyId: '' })
+    setDownloadModalOpen(true)
+  }
+
   // 编辑内核
   const handleEdit = (record: CoreDisplayInfo) => {
     const core = cores.find(c => c.coreId === record.coreId)
@@ -347,6 +408,30 @@ export function CoreManagementPage() {
     }
   }
 
+  const handleDownloadReleaseChange = (value: string) => {
+    downloadFormDirtyRef.current = true
+    setSelectedRelease(value)
+    const option = releaseOptions.find(item => item.value === value)
+    if (!option) return
+    applyReleaseOption(option)
+  }
+
+  const selectedReleaseOption = releaseOptions.find(option => option.value === selectedRelease) || null
+  const releaseSelectOptions = [
+    {
+      value: '',
+      label: releasesLoading
+        ? '正在从 GitHub 拉取版本...'
+        : releaseOptions.length > 0
+          ? '请选择版本'
+          : '暂无可用版本',
+    },
+    ...releaseOptions.map(option => ({
+      value: option.value,
+      label: option.label,
+    })),
+  ]
+
   // 打开设置编辑弹窗
   const handleEditSettings = () => {
     setSettingsForm({
@@ -392,7 +477,7 @@ export function CoreManagementPage() {
           <p className="text-sm text-[var(--color-text-muted)] mt-1">管理 Chrome 内核版本和全局设置</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setDownloadModalOpen(true)}>下载内核</Button>
+          <Button size="sm" variant="secondary" onClick={handleOpenDownloadModal}>下载内核</Button>
           <Button size="sm" variant="secondary" onClick={handleScan} loading={scanning}>扫描内核</Button>
           <Button size="sm" onClick={handleAdd}>新增内核</Button>
         </div>
@@ -599,10 +684,45 @@ export function CoreManagementPage() {
           </>
         }>
         <div className="space-y-4">
+          <FormItem label="版本选择">
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Select
+                  value={selectedRelease}
+                  onChange={e => handleDownloadReleaseChange(e.target.value)}
+                  options={releaseSelectOptions}
+                  disabled={downloadProgress !== null || releasesLoading}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void loadReleaseOptions()}
+                  loading={releasesLoading}
+                  disabled={downloadProgress !== null}
+                >
+                  刷新
+                </Button>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                默认从 fingerprint-chromium Releases 拉取可下载的 ZIP 版本。
+              </p>
+              {selectedReleaseOption && (
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  已选择文件：{selectedReleaseOption.assetName}
+                </p>
+              )}
+              {releasesError && (
+                <p className="text-xs text-red-500">{releasesError}</p>
+              )}
+            </div>
+          </FormItem>
           <FormItem label="内核名称" required>
             <Input
               value={downloadForm.name}
-              onChange={e => setDownloadForm(prev => ({ ...prev, name: e.target.value }))}
+              onChange={e => {
+                downloadFormDirtyRef.current = true
+                setDownloadForm(prev => ({ ...prev, name: e.target.value }))
+              }}
               placeholder="例如: chrome-139"
               disabled={downloadProgress !== null}
             />
@@ -611,7 +731,10 @@ export function CoreManagementPage() {
           <FormItem label="下载地址 (ZIP)" required>
             <Input
               value={downloadForm.url}
-              onChange={e => setDownloadForm(prev => ({ ...prev, url: e.target.value }))}
+              onChange={e => {
+                downloadFormDirtyRef.current = true
+                setDownloadForm(prev => ({ ...prev, url: e.target.value }))
+              }}
               placeholder="https://github.com/.../release.zip"
               disabled={downloadProgress !== null}
             />
