@@ -290,6 +290,94 @@ export function QuitAppOnly() {
   return window['go']['main']['App']['QuitAppOnly']();
 }
 
+export function RPAFlowDelete(arg1) {
+  return window['go']['main']['App']['RPAFlowDelete'](arg1);
+}
+
+export function RPAFlowEncodeXML(arg1) {
+  return window['go']['main']['App']['RPAFlowEncodeXML'](arg1);
+}
+
+export function RPAFlowExportXML(arg1) {
+  return window['go']['main']['App']['RPAFlowExportXML'](arg1);
+}
+
+export function RPAFlowGroupCreate(arg1) {
+  return window['go']['main']['App']['RPAFlowGroupCreate'](arg1);
+}
+
+export function RPAFlowGroupList() {
+  return window['go']['main']['App']['RPAFlowGroupList']();
+}
+
+export function RPAFlowImportByShareCode(arg1) {
+  return window['go']['main']['App']['RPAFlowImportByShareCode'](arg1);
+}
+
+export function RPAFlowImportXML(arg1) {
+  return window['go']['main']['App']['RPAFlowImportXML'](arg1);
+}
+
+export function RPAFlowList(arg1, arg2) {
+  return window['go']['main']['App']['RPAFlowList'](arg1, arg2);
+}
+
+export function RPAFlowParseXML(arg1) {
+  return window['go']['main']['App']['RPAFlowParseXML'](arg1);
+}
+
+export function RPAFlowSave(arg1) {
+  return window['go']['main']['App']['RPAFlowSave'](arg1);
+}
+
+export function RPAFlowShare(arg1) {
+  return window['go']['main']['App']['RPAFlowShare'](arg1);
+}
+
+export function RPARunList() {
+  return window['go']['main']['App']['RPARunList']();
+}
+
+export function RPARunTargetList(arg1) {
+  return window['go']['main']['App']['RPARunTargetList'](arg1);
+}
+
+export function RPATaskDelete(arg1) {
+  return window['go']['main']['App']['RPATaskDelete'](arg1);
+}
+
+export function RPATaskExecute(arg1) {
+  return window['go']['main']['App']['RPATaskExecute'](arg1);
+}
+
+export function RPATaskGet(arg1) {
+  return window['go']['main']['App']['RPATaskGet'](arg1);
+}
+
+export function RPATaskList() {
+  return window['go']['main']['App']['RPATaskList']();
+}
+
+export function RPATaskSave(arg1, arg2) {
+  return window['go']['main']['App']['RPATaskSave'](arg1, arg2);
+}
+
+export function RPATemplateCreateFlow(arg1) {
+  return window['go']['main']['App']['RPATemplateCreateFlow'](arg1);
+}
+
+export function RPATemplateDelete(arg1) {
+  return window['go']['main']['App']['RPATemplateDelete'](arg1);
+}
+
+export function RPATemplateList() {
+  return window['go']['main']['App']['RPATemplateList']();
+}
+
+export function RPATemplateSave(arg1) {
+  return window['go']['main']['App']['RPATemplateSave'](arg1);
+}
+
 export function ReloadConfig() {
   return window['go']['main']['App']['ReloadConfig']();
 }

@@ -39,6 +39,10 @@ const TagManagementPage = lazyNamed(() => import('./modules/browser/pages/TagMan
 const AutomationPage = lazyNamed(() => import('./modules/browser/pages/AutomationPage'), 'AutomationPage')
 const UsageTutorialPage = lazyNamed(() => import('./modules/browser/pages/UsageTutorialPage'), 'UsageTutorialPage')
 const QuickLaunchModal = lazyNamed(() => import('./modules/browser/components/QuickLaunchModal'), 'QuickLaunchModal')
+const FlowManagementPage = lazyNamed(() => import('./modules/rpa/pages/FlowManagementPage'), 'FlowManagementPage')
+const TaskManagementPage = lazyNamed(() => import('./modules/rpa/pages/TaskManagementPage'), 'TaskManagementPage')
+const RunRecordsPage = lazyNamed(() => import('./modules/rpa/pages/RunRecordsPage'), 'RunRecordsPage')
+const TemplateCenterPage = lazyNamed(() => import('./modules/rpa/pages/TemplateCenterPage'), 'TemplateCenterPage')
 
 function useWailsNotifications() {
   const addNotification = useNotificationStore((s) => s.addNotification)
@@ -88,6 +92,10 @@ function useWailsNotifications() {
   }, [addNotification])
 }
 
+function hasWailsRuntime() {
+  return typeof window !== 'undefined' && !!(window as any).runtime
+}
+
 function CloseConfirmModal() {
   const [open, setOpen] = useState(false)
   const [platform, setPlatform] = useState('windows')
@@ -112,6 +120,9 @@ function CloseConfirmModal() {
   }, [])
 
   useEffect(() => {
+    if (!hasWailsRuntime()) {
+      return
+    }
     let cancelled = false
 
     Environment()
@@ -135,6 +146,7 @@ function CloseConfirmModal() {
   const handleMinimize = () => {
     if (quitting) return
     setOpen(false)
+    if (!hasWailsRuntime()) return
     if (supportsTray) {
       WindowHide()
       return
@@ -143,6 +155,7 @@ function CloseConfirmModal() {
   }
 
   const handleQuitAppOnly = async () => {
+    if (!hasWailsRuntime()) return
     setQuittingAction('app-only')
     try {
       await QuitAppOnlyApp()
@@ -153,6 +166,7 @@ function CloseConfirmModal() {
   }
 
   const handleQuitAppAndBrowsers = async () => {
+    if (!hasWailsRuntime()) return
     setQuittingAction('app-and-browser')
     try {
       await Promise.race([
@@ -294,6 +308,10 @@ function App() {
               <Route path="/browser/launch-api" element={<LaunchApiDocsPage />} />
               <Route path="/browser/tags" element={<TagManagementPage />} />
               <Route path="/system/tutorial" element={<UsageTutorialPage />} />
+              <Route path="/rpa/flows" element={<FlowManagementPage />} />
+              <Route path="/rpa/tasks" element={<TaskManagementPage />} />
+              <Route path="/rpa/runs" element={<RunRecordsPage />} />
+              <Route path="/rpa/templates" element={<TemplateCenterPage />} />
             </Routes>
           </Suspense>
         </Layout>

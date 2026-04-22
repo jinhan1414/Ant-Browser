@@ -8,6 +8,7 @@ import (
 	"ant-chrome/backend/internal/launchcode"
 	"ant-chrome/backend/internal/logger"
 	"ant-chrome/backend/internal/proxy"
+	"ant-chrome/backend/internal/rpa"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,6 +45,9 @@ type App struct {
 	launchCodeSvc  *launchcode.LaunchCodeService
 	launchServer   *launchcode.LaunchServer
 	speedScheduler *browser.ProxySpeedScheduler
+	rpaSvc         *rpa.Service
+	rpaExecutor    rpaExecutionEngine
+	rpaScheduler   *rpa.TaskScheduler
 	appRoot        string
 	version        string
 
@@ -187,6 +191,26 @@ func (a *App) startup(ctx context.Context) {
 		log.Error("LaunchCode 加载失败", logger.F("error", err))
 	}
 	a.browserMgr.CodeProvider = a.launchCodeSvc
+
+	flowDAO := rpa.NewSQLiteFlowDAO(conn)
+	taskDAO := rpa.NewSQLiteTaskDAO(conn)
+	runDAO := rpa.NewSQLiteRunDAO(conn)
+	templateDAO := rpa.NewSQLiteTemplateDAO(conn)
+	a.rpaSvc = rpa.NewService(flowDAO, taskDAO, runDAO, templateDAO)
+	a.rpaExecutor = rpa.NewExecutor(&appRPAOperator{app: a})
+	a.rpaScheduler = rpa.NewTaskScheduler(
+		a.rpaSvc.ListTasks,
+		func(taskID string) (*rpa.Task, error) {
+			task, _, err := a.rpaSvc.GetTask(taskID)
+			return task, err
+		},
+		func(taskID string) error {
+			_, err := a.executeRPATask(taskID, rpa.RunTriggerScheduled)
+			return err
+		},
+		time.Second,
+	)
+	a.rpaScheduler.Start()
 
 	// 启动 LaunchServer
 	port := a.config.LaunchServer.Port

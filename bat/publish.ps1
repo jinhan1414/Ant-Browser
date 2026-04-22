@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
+. (Join-Path $PSScriptRoot "shared-build-output.ps1")
 
 $script:Version = ""
 $script:LinuxArch = ""
@@ -256,6 +257,7 @@ function Build-WindowsBinary {
         finally {
             Pop-Location
         }
+        Remove-BuildExecutableOnly -RepoRoot $repoRoot
         Invoke-NativeCommand -FilePath "wails" -Arguments @("build")
     }
     finally {
