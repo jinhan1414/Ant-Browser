@@ -38,6 +38,11 @@ func (a *App) stopRuntimeServices() {
 			a.speedScheduler = nil
 		}
 
+		if a.rpaScheduler != nil {
+			a.rpaScheduler.Stop()
+			a.rpaScheduler = nil
+		}
+
 		if a.launchServer != nil {
 			if err := a.launchServer.Stop(); err != nil {
 				log.Error("LaunchServer 关闭失败", logger.F("error", err))

@@ -43,6 +43,15 @@ export const navigationConfig: NavSection[] = [
     ]
   },
   {
+    title: 'RPA',
+    items: [
+      { name: '流程管理', path: '/rpa/flows', icon: 'Layers' },
+      { name: '任务管理', path: '/rpa/tasks', icon: 'ListChecks' },
+      { name: '运行记录', path: '/rpa/runs', icon: 'Activity' },
+      { name: '模板中心', path: '/rpa/templates', icon: 'BookOpen' },
+    ]
+  },
+  {
     title: '系统维护',
     items: [
       { name: '系统设置', path: '/settings', icon: 'Settings' },

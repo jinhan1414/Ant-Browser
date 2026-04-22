@@ -648,3 +648,433 @@ export namespace logger {
 
 }
 
+export namespace rpa {
+	
+	export class FlowEdge {
+	    edgeId: string;
+	    sourceNodeId: string;
+	    targetNodeId: string;
+	    condition: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowEdge(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.edgeId = source["edgeId"];
+	        this.sourceNodeId = source["sourceNodeId"];
+	        this.targetNodeId = source["targetNodeId"];
+	        this.condition = source["condition"];
+	    }
+	}
+	export class FlowPosition {
+	    x: number;
+	    y: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowPosition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.x = source["x"];
+	        this.y = source["y"];
+	    }
+	}
+	export class FlowNode {
+	    nodeId: string;
+	    nodeType: string;
+	    label: string;
+	    position: FlowPosition;
+	    config: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.nodeType = source["nodeType"];
+	        this.label = source["label"];
+	        this.position = this.convertValues(source["position"], FlowPosition);
+	        this.config = source["config"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FlowVariable {
+	    name: string;
+	    type: string;
+	    defaultValue: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowVariable(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.defaultValue = source["defaultValue"];
+	    }
+	}
+	export class FlowDocument {
+	    schemaVersion: number;
+	    variables: FlowVariable[];
+	    nodes: FlowNode[];
+	    edges: FlowEdge[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowDocument(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.variables = this.convertValues(source["variables"], FlowVariable);
+	        this.nodes = this.convertValues(source["nodes"], FlowNode);
+	        this.edges = this.convertValues(source["edges"], FlowEdge);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FlowStep {
+	    stepId: string;
+	    stepName: string;
+	    stepType: string;
+	    config: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stepId = source["stepId"];
+	        this.stepName = source["stepName"];
+	        this.stepType = source["stepType"];
+	        this.config = source["config"];
+	    }
+	}
+	export class Flow {
+	    flowId: string;
+	    flowName: string;
+	    groupId: string;
+	    steps: FlowStep[];
+	    document: FlowDocument;
+	    sourceType: string;
+	    sourceXml: string;
+	    shareCode: string;
+	    version: number;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Flow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.flowId = source["flowId"];
+	        this.flowName = source["flowName"];
+	        this.groupId = source["groupId"];
+	        this.steps = this.convertValues(source["steps"], FlowStep);
+	        this.document = this.convertValues(source["document"], FlowDocument);
+	        this.sourceType = source["sourceType"];
+	        this.sourceXml = source["sourceXml"];
+	        this.shareCode = source["shareCode"];
+	        this.version = source["version"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	export class FlowGroup {
+	    groupId: string;
+	    groupName: string;
+	    sortOrder: number;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowGroup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.groupId = source["groupId"];
+	        this.groupName = source["groupName"];
+	        this.sortOrder = source["sortOrder"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class FlowGroupInput {
+	    groupName: string;
+	    sortOrder: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowGroupInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.groupName = source["groupName"];
+	        this.sortOrder = source["sortOrder"];
+	    }
+	}
+	
+	
+	
+	
+	export class FlowXMLImportInput {
+	    flowName: string;
+	    xmlText: string;
+	    groupId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowXMLImportInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.flowName = source["flowName"];
+	        this.xmlText = source["xmlText"];
+	        this.groupId = source["groupId"];
+	    }
+	}
+	export class Run {
+	    runId: string;
+	    taskId: string;
+	    flowId: string;
+	    triggerType: string;
+	    status: string;
+	    summary: string;
+	    startedAt: string;
+	    finishedAt: string;
+	    errorMessage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Run(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.runId = source["runId"];
+	        this.taskId = source["taskId"];
+	        this.flowId = source["flowId"];
+	        this.triggerType = source["triggerType"];
+	        this.status = source["status"];
+	        this.summary = source["summary"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
+	        this.errorMessage = source["errorMessage"];
+	    }
+	}
+	export class RunTarget {
+	    runTargetId: string;
+	    runId: string;
+	    profileId: string;
+	    profileName: string;
+	    status: string;
+	    stepIndex: number;
+	    startedAt: string;
+	    finishedAt: string;
+	    errorMessage: string;
+	    debugPort: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.runTargetId = source["runTargetId"];
+	        this.runId = source["runId"];
+	        this.profileId = source["profileId"];
+	        this.profileName = source["profileName"];
+	        this.status = source["status"];
+	        this.stepIndex = source["stepIndex"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
+	        this.errorMessage = source["errorMessage"];
+	        this.debugPort = source["debugPort"];
+	    }
+	}
+	export class Task {
+	    taskId: string;
+	    taskName: string;
+	    flowId: string;
+	    executionOrder: string;
+	    taskType: string;
+	    scheduleConfig: Record<string, any>;
+	    enabled: boolean;
+	    lastRunAt: string;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Task(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.taskId = source["taskId"];
+	        this.taskName = source["taskName"];
+	        this.flowId = source["flowId"];
+	        this.executionOrder = source["executionOrder"];
+	        this.taskType = source["taskType"];
+	        this.scheduleConfig = source["scheduleConfig"];
+	        this.enabled = source["enabled"];
+	        this.lastRunAt = source["lastRunAt"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class TaskTarget {
+	    taskId: string;
+	    profileId: string;
+	    sortOrder: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.taskId = source["taskId"];
+	        this.profileId = source["profileId"];
+	        this.sortOrder = source["sortOrder"];
+	    }
+	}
+	export class TaskDetail {
+	    task?: Task;
+	    targets: TaskTarget[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.task = this.convertValues(source["task"], Task);
+	        this.targets = this.convertValues(source["targets"], TaskTarget);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class Template {
+	    templateId: string;
+	    templateName: string;
+	    description: string;
+	    tags: string[];
+	    flowSnapshot: Flow;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Template(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.templateId = source["templateId"];
+	        this.templateName = source["templateName"];
+	        this.description = source["description"];
+	        this.tags = source["tags"];
+	        this.flowSnapshot = this.convertValues(source["flowSnapshot"], Flow);
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+

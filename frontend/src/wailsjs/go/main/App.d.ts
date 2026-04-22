@@ -5,6 +5,7 @@ import {config} from '../models';
 import {browser} from '../models';
 import {backend} from '../models';
 import {logger} from '../models';
+import {rpa} from '../models';
 import {launchcode} from '../models';
 
 export function BackupExportPackage():Promise<Record<string, any>>;
@@ -150,6 +151,50 @@ export function OpenCorePath(arg1:string):Promise<void>;
 export function OpenUserDataDir(arg1:string):Promise<void>;
 
 export function QuitAppOnly():Promise<void>;
+
+export function RPAFlowDelete(arg1:string):Promise<void>;
+
+export function RPAFlowEncodeXML(arg1:rpa.Flow):Promise<string>;
+
+export function RPAFlowExportXML(arg1:string):Promise<string>;
+
+export function RPAFlowGroupCreate(arg1:rpa.FlowGroupInput):Promise<rpa.FlowGroup>;
+
+export function RPAFlowGroupList():Promise<Array<rpa.FlowGroup>>;
+
+export function RPAFlowImportByShareCode(arg1:string):Promise<rpa.Flow>;
+
+export function RPAFlowImportXML(arg1:rpa.FlowXMLImportInput):Promise<rpa.Flow>;
+
+export function RPAFlowList(arg1:string,arg2:string):Promise<Array<rpa.Flow>>;
+
+export function RPAFlowParseXML(arg1:rpa.FlowXMLImportInput):Promise<rpa.Flow>;
+
+export function RPAFlowSave(arg1:rpa.Flow):Promise<rpa.Flow>;
+
+export function RPAFlowShare(arg1:string):Promise<string>;
+
+export function RPARunList():Promise<Array<rpa.Run>>;
+
+export function RPARunTargetList(arg1:string):Promise<Array<rpa.RunTarget>>;
+
+export function RPATaskDelete(arg1:string):Promise<void>;
+
+export function RPATaskExecute(arg1:string):Promise<rpa.Run>;
+
+export function RPATaskGet(arg1:string):Promise<rpa.TaskDetail>;
+
+export function RPATaskList():Promise<Array<rpa.Task>>;
+
+export function RPATaskSave(arg1:rpa.Task,arg2:Array<rpa.TaskTarget>):Promise<rpa.Task>;
+
+export function RPATemplateCreateFlow(arg1:string):Promise<rpa.Flow>;
+
+export function RPATemplateDelete(arg1:string):Promise<void>;
+
+export function RPATemplateList():Promise<Array<rpa.Template>>;
+
+export function RPATemplateSave(arg1:rpa.Template):Promise<rpa.Template>;
 
 export function ReloadConfig():Promise<void>;
 

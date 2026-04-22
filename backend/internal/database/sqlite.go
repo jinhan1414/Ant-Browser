@@ -135,6 +135,94 @@ var migrations = []migration{
 			`ALTER TABLE browser_profiles ADD COLUMN proxy_bind_updated_at TEXT NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		version: 7,
+		desc:    "新增 RPA 流程任务运行记录模板表",
+		stmts: []string{
+			`CREATE TABLE IF NOT EXISTS rpa_flow_groups (
+				group_id    TEXT PRIMARY KEY,
+				group_name  TEXT NOT NULL,
+				sort_order  INTEGER NOT NULL DEFAULT 0,
+				created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			)`,
+			`CREATE TABLE IF NOT EXISTS rpa_flows (
+				flow_id      TEXT PRIMARY KEY,
+				flow_name    TEXT NOT NULL,
+				group_id     TEXT NOT NULL DEFAULT '',
+				steps_json   TEXT NOT NULL DEFAULT '[]',
+				share_code   TEXT NOT NULL DEFAULT '',
+				version      INTEGER NOT NULL DEFAULT 1,
+				created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_flows_group_id ON rpa_flows(group_id)`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_rpa_flows_share_code ON rpa_flows(share_code) WHERE share_code != ''`,
+			`CREATE TABLE IF NOT EXISTS rpa_tasks (
+				task_id               TEXT PRIMARY KEY,
+				task_name             TEXT NOT NULL,
+				flow_id               TEXT NOT NULL,
+				execution_order       TEXT NOT NULL DEFAULT 'sequential',
+				task_type             TEXT NOT NULL DEFAULT 'manual',
+				schedule_config_json  TEXT NOT NULL DEFAULT '{}',
+				enabled               INTEGER NOT NULL DEFAULT 1,
+				last_run_at           TEXT NOT NULL DEFAULT '',
+				created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_tasks_flow_id ON rpa_tasks(flow_id)`,
+			`CREATE TABLE IF NOT EXISTS rpa_task_targets (
+				task_id      TEXT NOT NULL,
+				profile_id   TEXT NOT NULL,
+				sort_order   INTEGER NOT NULL DEFAULT 0,
+				PRIMARY KEY (task_id, profile_id)
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_task_targets_task_id ON rpa_task_targets(task_id)`,
+			`CREATE TABLE IF NOT EXISTS rpa_runs (
+				run_id          TEXT PRIMARY KEY,
+				task_id         TEXT NOT NULL,
+				flow_id         TEXT NOT NULL,
+				trigger_type    TEXT NOT NULL DEFAULT 'manual',
+				status          TEXT NOT NULL DEFAULT 'pending',
+				summary         TEXT NOT NULL DEFAULT '',
+				started_at      TEXT NOT NULL DEFAULT '',
+				finished_at     TEXT NOT NULL DEFAULT '',
+				error_message   TEXT NOT NULL DEFAULT ''
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_runs_task_id ON rpa_runs(task_id)`,
+			`CREATE TABLE IF NOT EXISTS rpa_run_targets (
+				run_target_id   TEXT PRIMARY KEY,
+				run_id          TEXT NOT NULL,
+				profile_id      TEXT NOT NULL,
+				profile_name    TEXT NOT NULL DEFAULT '',
+				status          TEXT NOT NULL DEFAULT 'pending',
+				step_index      INTEGER NOT NULL DEFAULT 0,
+				started_at      TEXT NOT NULL DEFAULT '',
+				finished_at     TEXT NOT NULL DEFAULT '',
+				error_message   TEXT NOT NULL DEFAULT '',
+				debug_port      INTEGER NOT NULL DEFAULT 0
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_run_targets_run_id ON rpa_run_targets(run_id)`,
+			`CREATE TABLE IF NOT EXISTS rpa_templates (
+				template_id          TEXT PRIMARY KEY,
+				template_name        TEXT NOT NULL,
+				description          TEXT NOT NULL DEFAULT '',
+				tags_json            TEXT NOT NULL DEFAULT '[]',
+				flow_snapshot_json   TEXT NOT NULL DEFAULT '{}',
+				created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			)`,
+		},
+	},
+	{
+		version: 8,
+		desc:    "RPA 流程升级为文档模型",
+		stmts: []string{
+			`ALTER TABLE rpa_flows ADD COLUMN document_json TEXT NOT NULL DEFAULT '{}'`,
+			`ALTER TABLE rpa_flows ADD COLUMN source_type TEXT NOT NULL DEFAULT 'visual'`,
+			`ALTER TABLE rpa_flows ADD COLUMN source_xml TEXT NOT NULL DEFAULT ''`,
+		},
+	},
 	// ── 新版本在此追加，格式：
 	// {
 	//     version: 4,

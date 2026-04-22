@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
+. (Join-Path $PSScriptRoot "shared-build-output.ps1")
 
 function Invoke-NativeCommand {
     param(
@@ -123,6 +124,7 @@ try {
 
     Write-Host ""
     Write-Host "[6/7] Building app..."
+    Remove-BuildExecutableOnly -RepoRoot $repoRoot
     Invoke-NativeCommand -FilePath "wails" -Arguments @("build")
 
     if ($tempDistCreated -and (Test-Path -LiteralPath $frontendDist)) {

@@ -1,0 +1,139 @@
+package rpa
+
+import "strings"
+
+type FlowSourceType string
+
+const (
+	FlowSourceVisual    FlowSourceType = "visual"
+	FlowSourceXMLImport FlowSourceType = "xml_import"
+)
+
+type FlowNodeType string
+
+const (
+	NodeTypeStart          FlowNodeType = "start"
+	NodeTypeEnd            FlowNodeType = "end"
+	NodeTypeBrowserStart   FlowNodeType = "browser.start"
+	NodeTypeBrowserOpenURL FlowNodeType = "browser.open_url"
+	NodeTypeDelay          FlowNodeType = "delay"
+	NodeTypeBrowserStop    FlowNodeType = "browser.stop"
+)
+
+type FlowXMLImportInput struct {
+	FlowName string `json:"flowName"`
+	XMLText  string `json:"xmlText"`
+	GroupID  string `json:"groupId"`
+}
+
+type FlowPosition struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type FlowVariable struct {
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	DefaultValue string `json:"defaultValue"`
+}
+
+type FlowNode struct {
+	NodeID   string         `json:"nodeId"`
+	NodeType FlowNodeType   `json:"nodeType"`
+	Label    string         `json:"label"`
+	Position FlowPosition   `json:"position"`
+	Config   map[string]any `json:"config"`
+}
+
+type FlowEdge struct {
+	EdgeID       string `json:"edgeId"`
+	SourceNodeID string `json:"sourceNodeId"`
+	TargetNodeID string `json:"targetNodeId"`
+	Condition    string `json:"condition"`
+}
+
+type FlowDocument struct {
+	SchemaVersion int            `json:"schemaVersion"`
+	Variables     []FlowVariable `json:"variables"`
+	Nodes         []FlowNode     `json:"nodes"`
+	Edges         []FlowEdge     `json:"edges"`
+}
+
+func defaultFlowDocument() FlowDocument {
+	return FlowDocument{
+		SchemaVersion: 2,
+		Variables:     []FlowVariable{},
+		Nodes: []FlowNode{
+			newFlowNode("start_1", NodeTypeStart, "开始", 120, 160, nil),
+			newFlowNode("end_1", NodeTypeEnd, "结束", 520, 160, nil),
+		},
+		Edges: []FlowEdge{
+			{
+				EdgeID:       "edge_start_end",
+				SourceNodeID: "start_1",
+				TargetNodeID: "end_1",
+			},
+		},
+	}
+}
+
+func newFlowNode(nodeID string, nodeType FlowNodeType, label string, x float64, y float64, config map[string]any) FlowNode {
+	if config == nil {
+		config = map[string]any{}
+	}
+	return FlowNode{
+		NodeID:   nodeID,
+		NodeType: nodeType,
+		Label:    label,
+		Position: FlowPosition{X: x, Y: y},
+		Config:   config,
+	}
+}
+
+func cloneDocument(input FlowDocument) FlowDocument {
+	out := FlowDocument{
+		SchemaVersion: input.SchemaVersion,
+		Variables:     append([]FlowVariable{}, input.Variables...),
+		Nodes:         make([]FlowNode, 0, len(input.Nodes)),
+		Edges:         append([]FlowEdge{}, input.Edges...),
+	}
+	for _, node := range input.Nodes {
+		out.Nodes = append(out.Nodes, FlowNode{
+			NodeID:   node.NodeID,
+			NodeType: node.NodeType,
+			Label:    node.Label,
+			Position: node.Position,
+			Config:   cloneMap(node.Config),
+		})
+	}
+	return out
+}
+
+func normalizeDocument(document FlowDocument) FlowDocument {
+	if document.SchemaVersion <= 0 {
+		document.SchemaVersion = 2
+	}
+	if document.Variables == nil {
+		document.Variables = []FlowVariable{}
+	}
+	if document.Nodes == nil {
+		document.Nodes = []FlowNode{}
+	}
+	if document.Edges == nil {
+		document.Edges = []FlowEdge{}
+	}
+	for idx := range document.Nodes {
+		document.Nodes[idx].NodeID = strings.TrimSpace(document.Nodes[idx].NodeID)
+		document.Nodes[idx].Label = strings.TrimSpace(document.Nodes[idx].Label)
+		if document.Nodes[idx].Config == nil {
+			document.Nodes[idx].Config = map[string]any{}
+		}
+	}
+	for idx := range document.Edges {
+		document.Edges[idx].EdgeID = strings.TrimSpace(document.Edges[idx].EdgeID)
+		document.Edges[idx].SourceNodeID = strings.TrimSpace(document.Edges[idx].SourceNodeID)
+		document.Edges[idx].TargetNodeID = strings.TrimSpace(document.Edges[idx].TargetNodeID)
+		document.Edges[idx].Condition = strings.TrimSpace(document.Edges[idx].Condition)
+	}
+	return document
+}

@@ -13,6 +13,7 @@ export function Button({
   size = 'md',
   loading = false,
   disabled,
+  type,
   className,
   children,
   ...props
@@ -34,6 +35,7 @@ export function Button({
 
   return (
     <button
+      type={type || 'button'}
       className={clsx(
         baseStyles,
         variants[variant],

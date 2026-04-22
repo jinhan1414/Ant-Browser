@@ -83,6 +83,7 @@ bat\build.bat
 
 - 开发分支默认按完整源码构建
 - 若缺少 `go.mod`、`main.go`、`wails.json` 等核心入口文件，脚本会直接失败，避免复用旧产物掩盖问题
+- 构建前若存在旧的 `build\bin\ant-chrome.exe`，脚本只会删除这个 exe，本目录下的 `config.yaml`、`data\`、`bin\` 等运行环境文件不会被递归清理
 
 ### `publish.bat`
 
@@ -110,6 +111,7 @@ bat\publish.bat B -Version 1.1.0
 
 - `-Version 1.1.0` 会覆盖本次发布使用的版本号。
 - Windows / Linux 包名、NSIS 安装包版本号，以及本次构建期间读取到的 `wails.json productVersion` 会统一使用该值。
+- Windows 打包前若存在旧的 `build\bin\ant-chrome.exe`，脚本只会删除这个 exe，不会删除 `build\bin` 下的其他运行环境文件。
 
 Windows 打包依赖 NSIS，默认查找顺序：
 
