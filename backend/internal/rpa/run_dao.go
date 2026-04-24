@@ -16,6 +16,8 @@ type RunDAO interface {
 	CreateRunTarget(target *RunTarget) error
 	UpdateRunTarget(target *RunTarget) error
 	ListRunTargets(runID string) ([]*RunTarget, error)
+	CreateRunStep(step *RunStep) error
+	ListRunSteps(runID string) ([]*RunStep, error)
 }
 
 type SQLiteRunDAO struct {
@@ -112,6 +114,37 @@ func (d *SQLiteRunDAO) ListRunTargets(runID string) ([]*RunTarget, error) {
 	return items, rows.Err()
 }
 
+func (d *SQLiteRunDAO) CreateRunStep(step *RunStep) error {
+	if step == nil {
+		return fmt.Errorf("运行步骤不能为空")
+	}
+	now := time.Now().Format(time.RFC3339)
+	prepareRunStepForSave(step, now)
+	_, err := d.db.Exec(`INSERT INTO rpa_run_steps (run_step_id, run_id, run_target_id, profile_id, node_id, node_type, node_label, status, attempt, output_json, error_message, started_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		step.RunStepID, step.RunID, step.RunTargetID, step.ProfileID, step.NodeID, step.NodeType, step.NodeLabel, step.Status, step.Attempt, step.OutputJSON, step.ErrorMessage, step.StartedAt, step.FinishedAt)
+	if err != nil {
+		return fmt.Errorf("创建运行步骤失败: %w", err)
+	}
+	return nil
+}
+
+func (d *SQLiteRunDAO) ListRunSteps(runID string) ([]*RunStep, error) {
+	rows, err := d.db.Query(`SELECT run_step_id, run_id, run_target_id, profile_id, node_id, node_type, node_label, status, attempt, output_json, error_message, started_at, finished_at FROM rpa_run_steps WHERE run_id = ? ORDER BY started_at ASC, run_step_id ASC`, strings.TrimSpace(runID))
+	if err != nil {
+		return nil, fmt.Errorf("查询运行步骤失败: %w", err)
+	}
+	defer rows.Close()
+	var items []*RunStep
+	for rows.Next() {
+		item := &RunStep{}
+		if err := rows.Scan(&item.RunStepID, &item.RunID, &item.RunTargetID, &item.ProfileID, &item.NodeID, &item.NodeType, &item.NodeLabel, &item.Status, &item.Attempt, &item.OutputJSON, &item.ErrorMessage, &item.StartedAt, &item.FinishedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func prepareRunForSave(run *Run, now string) {
 	if run.RunID == "" {
 		run.RunID = uuid.NewString()
@@ -136,5 +169,20 @@ func prepareRunTargetForSave(target *RunTarget, now string) {
 	}
 	if target.StartedAt == "" {
 		target.StartedAt = now
+	}
+}
+
+func prepareRunStepForSave(step *RunStep, now string) {
+	if step.RunStepID == "" {
+		step.RunStepID = uuid.NewString()
+	}
+	if step.Status == "" {
+		step.Status = RunStatusPending
+	}
+	if step.Attempt <= 0 {
+		step.Attempt = 1
+	}
+	if step.StartedAt == "" {
+		step.StartedAt = now
 	}
 }

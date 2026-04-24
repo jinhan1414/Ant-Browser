@@ -197,7 +197,7 @@ func (a *App) startup(ctx context.Context) {
 	runDAO := rpa.NewSQLiteRunDAO(conn)
 	templateDAO := rpa.NewSQLiteTemplateDAO(conn)
 	a.rpaSvc = rpa.NewService(flowDAO, taskDAO, runDAO, templateDAO)
-	a.rpaExecutor = rpa.NewExecutor(&appRPAOperator{app: a})
+	a.rpaExecutor = rpa.NewExecutorWithDeps(&appRPAOperator{app: a}, nil, newAppEventNotifier(a))
 	a.rpaScheduler = rpa.NewTaskScheduler(
 		a.rpaSvc.ListTasks,
 		func(taskID string) (*rpa.Task, error) {

@@ -44,12 +44,53 @@ const TaskManagementPage = lazyNamed(() => import('./modules/rpa/pages/TaskManag
 const RunRecordsPage = lazyNamed(() => import('./modules/rpa/pages/RunRecordsPage'), 'RunRecordsPage')
 const TemplateCenterPage = lazyNamed(() => import('./modules/rpa/pages/TemplateCenterPage'), 'TemplateCenterPage')
 
+type SystemNotificationPayload = {
+  appName?: string
+  title?: string
+  body?: string
+}
+
+function supportsSystemNotification() {
+  return typeof window !== 'undefined' && 'Notification' in window
+}
+
+async function ensureSystemNotificationPermission() {
+  if (!supportsSystemNotification()) {
+    return 'unsupported'
+  }
+  if (Notification.permission === 'granted') {
+    return 'granted'
+  }
+  if (Notification.permission === 'denied') {
+    return 'denied'
+  }
+  try {
+    return await Notification.requestPermission()
+  } catch {
+    return 'request_error'
+  }
+}
+
+async function showSystemNotification(payload: SystemNotificationPayload) {
+  const permission = await ensureSystemNotificationPermission()
+  if (permission !== 'granted') {
+    return permission
+  }
+  const notification = new Notification(payload.title || payload.appName || 'Ant Browser', {
+    body: payload.body || '',
+    tag: `ant-browser-${Date.now()}`,
+  })
+  notification.onclick = () => window.focus()
+  return 'granted'
+}
+
 function useWailsNotifications() {
   const addNotification = useNotificationStore((s) => s.addNotification)
 
   useEffect(() => {
     const runtime = (window as any).runtime
     if (!runtime?.EventsOn) return
+    let warnedReason = ''
 
     const offCrashed = runtime.EventsOn(
       'browser:instance:crashed',
@@ -84,10 +125,31 @@ function useWailsNotifications() {
       }
     )
 
+    const offSystemNotify = runtime.EventsOn(
+      'app:system-notify',
+      async (data: SystemNotificationPayload) => {
+        addNotification({
+          type: 'warning',
+          title: data?.title || data?.appName || '系统通知',
+          message: data?.body || '',
+        })
+        const result = await showSystemNotification(data || {})
+        if (result !== 'granted' && result !== warnedReason) {
+          warnedReason = result
+          addNotification({
+            type: 'warning',
+            title: '系统通知未发送',
+            message: `当前系统通知不可用，原因：${result}`,
+          })
+        }
+      }
+    )
+
     return () => {
       offCrashed?.()
       offBridgeFailed?.()
       offBridgeDied?.()
+      offSystemNotify?.()
     }
   }, [addNotification])
 }

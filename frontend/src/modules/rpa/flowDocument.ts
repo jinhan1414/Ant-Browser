@@ -1,32 +1,25 @@
 import type { Edge, Node } from 'reactflow'
-import type { RPAFlow, RPAFlowDocument, RPAFlowEdge, RPAFlowNode, RPAFlowNodeType } from './types'
+import { buildCanvasEdgeData, edgeFromCanvas, normalizeDocumentEdge } from './flowEdge'
+import type { RPAFlow, RPAFlowDocument, RPAFlowNode, RPAFlowNodeType } from './types'
 
 const DEFAULT_NODE_Y = 180
 const DEFAULT_START_X = 120
 const DEFAULT_END_X = 520
 
-export const FLOW_NODE_OPTIONS: { value: RPAFlowNodeType; label: string }[] = [
-  { value: 'browser.start', label: '启动浏览器' },
-  { value: 'browser.open_url', label: '打开页面' },
-  { value: 'delay', label: '等待' },
-  { value: 'browser.stop', label: '关闭浏览器' },
-]
-
 export function createDefaultDocument(): RPAFlowDocument {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     variables: [],
     nodes: [
       createDocumentNode('start_1', 'start', '开始', DEFAULT_START_X, DEFAULT_NODE_Y),
       createDocumentNode('end_1', 'end', '结束', DEFAULT_END_X, DEFAULT_NODE_Y),
     ],
     edges: [
-      {
+      normalizeDocumentEdge({
         edgeId: 'edge_start_end',
         sourceNodeId: 'start_1',
         targetNodeId: 'end_1',
-        condition: '',
-      },
+      }),
     ],
   }
 }
@@ -63,7 +56,7 @@ export function normalizeDocument(document?: Partial<RPAFlowDocument> | null): R
   const hasNodes = nodes.length > 0
   const hasEdges = edges.length > 0
   return {
-    schemaVersion: document?.schemaVersion || 2,
+    schemaVersion: document?.schemaVersion || 3,
     variables: Array.isArray(document?.variables) ? document!.variables : [],
     nodes: hasNodes
       ? nodes.map(node => ({
@@ -73,7 +66,7 @@ export function normalizeDocument(document?: Partial<RPAFlowDocument> | null): R
       }))
       : fallback.nodes,
     edges: hasEdges
-      ? edges
+      ? edges.map(edge => normalizeDocumentEdge(edge))
       : hasNodes
         ? []
         : fallback.edges,
@@ -90,14 +83,15 @@ export function documentToCanvas(document: RPAFlowDocument): { nodes: Node[]; ed
         label: node.label,
         nodeType: node.nodeType,
       },
-      draggable: node.nodeType !== 'start' && node.nodeType !== 'end',
+      draggable: true,
     })),
     edges: document.edges.map(edge => ({
       id: edge.edgeId,
       source: edge.sourceNodeId,
       target: edge.targetNodeId,
-      label: edge.condition || undefined,
+      label: buildCanvasEdgeData(edge).displayLabel || undefined,
       animated: false,
+      data: buildCanvasEdgeData(edge),
     })),
   }
 }
@@ -106,7 +100,7 @@ export function canvasToDocument(nodes: Node[], edges: Edge[], existing: RPAFlow
   const nodeMap = new Map(existing.nodes.map(node => [node.nodeId, node]))
   const edgeMap = new Map(existing.edges.map(edge => [edge.edgeId, edge]))
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     variables: existing.variables || [],
     nodes: nodes.map(node => {
       const original = nodeMap.get(node.id)
@@ -120,23 +114,25 @@ export function canvasToDocument(nodes: Node[], edges: Edge[], existing: RPAFlow
     }),
     edges: edges.map(edge => {
       const original = edgeMap.get(edge.id)
-      return {
-        edgeId: edge.id,
-        sourceNodeId: edge.source,
-        targetNodeId: edge.target,
-        condition: String(edge.label || original?.condition || ''),
-      }
+      return edgeFromCanvas(edge, original)
     }),
   }
 }
 
-export function createDocumentNode(nodeId: string, nodeType: RPAFlowNodeType, label: string, x: number, y: number): RPAFlowNode {
+export function createDocumentNode(
+  nodeId: string,
+  nodeType: RPAFlowNodeType,
+  label: string,
+  x: number,
+  y: number,
+  config: Record<string, any> = {},
+): RPAFlowNode {
   return {
     nodeId,
     nodeType,
     label,
     position: { x, y },
-    config: {},
+    config,
   }
 }
 
@@ -153,47 +149,28 @@ export function countRunnableNodes(flow: RPAFlow): number {
   return normalizeDocument(flow.document).nodes.filter(node => node.nodeType !== 'start' && node.nodeType !== 'end').length
 }
 
-export function insertNodeIntoDocument(document: RPAFlowDocument, nodeType: RPAFlowNodeType): { document: RPAFlowDocument; nodeId: string } {
+export function insertNodeIntoDocument(
+  document: RPAFlowDocument,
+  nodeType: RPAFlowNodeType,
+  label: string,
+  config: Record<string, any>,
+  positionOverride?: { x: number; y: number },
+): { document: RPAFlowDocument; nodeId: string } {
   const next = normalizeDocument(document)
   const nodeId = `${nodeType.replace('.', '_')}_${Date.now()}`
-  const label = FLOW_NODE_OPTIONS.find(option => option.value === nodeType)?.label || nodeType
-  const position = nextNodePosition(next)
-  const newNode = createDocumentNode(nodeId, nodeType, label, position.x, position.y)
-
-  const startNode = next.nodes.find(node => node.nodeType === 'start')
-  const endNode = next.nodes.find(node => node.nodeType === 'end')
-  if (!startNode || !endNode) {
-    return {
-      nodeId,
-      document: {
-        ...next,
-        nodes: [...next.nodes, newNode],
-      },
+  const position = positionOverride
+    ? {
+      x: Math.round(positionOverride.x),
+      y: Math.round(positionOverride.y),
     }
-  }
-
-  const endIncoming = next.edges.find(edge => edge.targetNodeId === endNode.nodeId)
-  const newEdges: RPAFlowEdge[] = next.edges.filter(edge => edge.edgeId !== endIncoming?.edgeId)
-  const sourceNodeId = endIncoming?.sourceNodeId || startNode.nodeId
-  newEdges.push({
-    edgeId: `edge_${sourceNodeId}_${nodeId}`,
-    sourceNodeId,
-    targetNodeId: nodeId,
-    condition: '',
-  })
-  newEdges.push({
-    edgeId: `edge_${nodeId}_${endNode.nodeId}`,
-    sourceNodeId: nodeId,
-    targetNodeId: endNode.nodeId,
-    condition: '',
-  })
+    : nextNodePosition(next)
+  const newNode = createDocumentNode(nodeId, nodeType, label, position.x, position.y, config)
 
   return {
     nodeId,
     document: {
       ...next,
-      nodes: [...next.nodes.filter(node => node.nodeId !== endNode.nodeId), newNode, endNode],
-      edges: newEdges,
+      nodes: [...next.nodes, newNode],
     },
   }
 }

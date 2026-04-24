@@ -172,13 +172,23 @@ func (s *Service) ListRunTargets(runID string) ([]*RunTarget, error) {
 	return s.runs.ListRunTargets(runID)
 }
 
-func (s *Service) SaveRun(run *Run, targets []*RunTarget) error {
+func (s *Service) ListRunSteps(runID string) ([]*RunStep, error) {
+	return s.runs.ListRunSteps(runID)
+}
+
+func (s *Service) SaveRun(run *Run, targets []*RunTarget, steps []*RunStep) error {
 	if err := s.runs.CreateRun(run); err != nil {
 		return err
 	}
 	for _, target := range targets {
 		target.RunID = run.RunID
 		if err := s.runs.CreateRunTarget(target); err != nil {
+			return err
+		}
+	}
+	for _, step := range steps {
+		step.RunID = run.RunID
+		if err := s.runs.CreateRunStep(step); err != nil {
 			return err
 		}
 	}

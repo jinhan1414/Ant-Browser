@@ -40,12 +40,15 @@ func TestExecutor_RunTaskSequentially(t *testing.T) {
 		{TaskID: task.TaskID, ProfileID: "profile-b", SortOrder: 2},
 	}
 
-	run, runTargets, err := executor.Execute(task, flow, targets)
+	run, runTargets, runSteps, err := executor.Execute(task, flow, targets)
 	if err != nil {
 		t.Fatalf("执行任务失败: %v", err)
 	}
 	if run.Status != RunStatusSuccess || len(runTargets) != 2 {
 		t.Fatalf("执行结果错误: run=%+v targets=%+v", run, runTargets)
+	}
+	if len(runSteps) == 0 {
+		t.Fatal("步骤记录不能为空")
 	}
 	if len(operator.started) != 2 || len(operator.stopped) != 2 {
 		t.Fatalf("浏览器操作次数错误: %+v", operator)
@@ -77,7 +80,7 @@ func TestExecutor_UnknownStepFailsTarget(t *testing.T) {
 	}
 	targets := []TaskTarget{{TaskID: task.TaskID, ProfileID: "profile-a", SortOrder: 1}}
 
-	run, runTargets, err := executor.Execute(task, flow, targets)
+	run, runTargets, _, err := executor.Execute(task, flow, targets)
 	if err == nil {
 		t.Fatal("未知步骤应返回错误")
 	}
@@ -118,12 +121,15 @@ func TestExecutor_ExecuteDocumentNodes(t *testing.T) {
 	}
 	targets := []TaskTarget{{TaskID: task.TaskID, ProfileID: "profile-a", SortOrder: 1}}
 
-	run, runTargets, err := executor.Execute(task, flow, targets)
+	run, runTargets, runSteps, err := executor.Execute(task, flow, targets)
 	if err != nil {
 		t.Fatalf("执行文档流程失败: %v", err)
 	}
 	if run.Status != RunStatusSuccess || len(runTargets) != 1 {
 		t.Fatalf("文档执行结果错误: run=%+v targets=%+v", run, runTargets)
+	}
+	if len(runSteps) < 2 {
+		t.Fatalf("文档步骤记录过少: %d", len(runSteps))
 	}
 	if len(operator.started) != 1 || operator.started[0] != "profile-a" {
 		t.Fatalf("文档流程未触发浏览器动作: %+v", operator.started)

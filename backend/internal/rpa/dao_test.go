@@ -162,6 +162,22 @@ func TestSQLiteRunAndTemplateDAO_BasicPersistence(t *testing.T) {
 	if err := runDAO.CreateRunTarget(target); err != nil {
 		t.Fatalf("创建运行目标失败: %v", err)
 	}
+	step := &RunStep{
+		RunID:       run.RunID,
+		RunTargetID: target.RunTargetID,
+		ProfileID:   "p1",
+		NodeID:      "read_1",
+		NodeType:    string(NodeTypeBrowserReadText),
+		NodeLabel:   "读取状态",
+		Status:      RunStatusSuccess,
+		Attempt:     1,
+		OutputJSON:  `{"text":"正常"}`,
+		StartedAt:   "2026-04-15T10:00:01Z",
+		FinishedAt:  "2026-04-15T10:00:02Z",
+	}
+	if err := runDAO.CreateRunStep(step); err != nil {
+		t.Fatalf("创建运行步骤失败: %v", err)
+	}
 
 	tpl := &Template{
 		TemplateName: "默认打开站点",
@@ -187,6 +203,13 @@ func TestSQLiteRunAndTemplateDAO_BasicPersistence(t *testing.T) {
 	}
 	if len(targets) != 1 || targets[0].ProfileName != "实例一" {
 		t.Fatalf("运行目标错误: %+v", targets)
+	}
+	steps, err := runDAO.ListRunSteps(run.RunID)
+	if err != nil {
+		t.Fatalf("查询运行步骤失败: %v", err)
+	}
+	if len(steps) != 1 || steps[0].NodeID != "read_1" {
+		t.Fatalf("运行步骤错误: %+v", steps)
 	}
 
 	templates, err := templateDAO.ListTemplates()

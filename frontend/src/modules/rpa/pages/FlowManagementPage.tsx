@@ -3,8 +3,8 @@ import { Copy, Download, FolderPlus, Plus, RefreshCw, Trash2 } from 'lucide-reac
 import { Button, Card, FormItem, Input, Select, Table, toast } from '../../../shared/components'
 import type { TableColumn } from '../../../shared/components'
 import { createRPAFlowGroup, deleteRPAFlow, encodeRPAFlowXML, fetchRPAFlowGroups, fetchRPAFlows, importRPAFlowByShareCode, saveRPAFlow, shareRPAFlow } from '../api'
-import { FLOW_XML_PROMPT_TEMPLATE } from '../aiPrompt'
 import { countRunnableNodes } from '../flowDocument'
+import { useFlowNodeCatalog } from '../nodeCatalog'
 import { FlowEditorModal } from '../components/FlowEditorModal'
 import { FlowXMLModal } from '../components/FlowXMLModal'
 import type { RPAFlow, RPAFlowGroup } from '../types'
@@ -12,6 +12,7 @@ import type { RPAFlow, RPAFlowGroup } from '../types'
 const formatTime = (value: string) => value ? new Date(value).toLocaleString('zh-CN') : '-'
 
 export function FlowManagementPage() {
+  const { xmlPromptTemplate } = useFlowNodeCatalog()
   const [flows, setFlows] = useState<RPAFlow[]>([])
   const [groups, setGroups] = useState<RPAFlowGroup[]>([])
   const [keyword, setKeyword] = useState('')
@@ -107,9 +108,9 @@ export function FlowManagementPage() {
               }
             }}><Download className="w-4 h-4" />导入分享码</Button>
             <Button size="sm" variant="secondary" onClick={async () => {
-              await navigator.clipboard.writeText(FLOW_XML_PROMPT_TEMPLATE)
+              await navigator.clipboard.writeText(xmlPromptTemplate)
               toast.success('AI 提示词已复制')
-            }}><Copy className="w-4 h-4" />复制 AI 提示词</Button>
+            }} disabled={!xmlPromptTemplate}><Copy className="w-4 h-4" />复制 AI 提示词</Button>
             <Button size="sm" variant="secondary" onClick={() => setXMLModalOpen(true)}><Download className="w-4 h-4" />导入 XML</Button>
             <Button size="sm" onClick={() => { setEditingFlow(null); setEditorOpen(true) }}><Plus className="w-4 h-4" />新建流程</Button>
           </>

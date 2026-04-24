@@ -3,13 +3,46 @@ export type RPATaskExecutionOrder = 'sequential' | 'random'
 export type RPATaskType = 'manual' | 'scheduled'
 export type RPARunStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
 export type RPAFlowSourceType = 'visual' | 'xml_import'
-export type RPAFlowNodeType =
-  | 'start'
-  | 'end'
-  | 'browser.start'
-  | 'browser.open_url'
-  | 'delay'
-  | 'browser.stop'
+export type RPAFlowNodeType = string
+export type RPAFlowEdgeBranchType = 'default' | 'true' | 'false' | 'on_error'
+
+export interface RPAFlowNodeField {
+  key: string
+  label: string
+  kind: 'string' | 'number'
+  storage: 'string' | 'number' | 'string_list_first'
+  required: boolean
+  hint: string
+  placeholder: string
+  xmlAttr: string
+  promptSample: string
+  defaultValue: any
+  minValue: number
+  multiline: boolean
+}
+
+export interface RPAFlowNodeCatalogItem {
+  nodeType: RPAFlowNodeType
+  label: string
+  category: string
+  description: string
+  palette: boolean
+  fixed: boolean
+  xmlSupported: boolean
+  promptEnabled: boolean
+  runtimeSupported: boolean
+  allowIncoming: boolean
+  allowOutgoing: boolean
+  maxOutgoing: number
+  supportsIfBranch: boolean
+  supportsOnError: boolean
+  fields: RPAFlowNodeField[]
+}
+
+export interface RPAFlowNodeCatalogPayload {
+  items: RPAFlowNodeCatalogItem[]
+  xmlPromptTemplate: string
+}
 
 export interface RPAFlowGroup {
   groupId: string
@@ -49,6 +82,8 @@ export interface RPAFlowEdge {
   edgeId: string
   sourceNodeId: string
   targetNodeId: string
+  label: string
+  branchType: RPAFlowEdgeBranchType
   condition: string
 }
 
@@ -126,6 +161,22 @@ export interface RPARunTarget {
   finishedAt: string
   errorMessage: string
   debugPort: number
+}
+
+export interface RPARunStep {
+  runStepId: string
+  runId: string
+  runTargetId: string
+  profileId: string
+  nodeId: string
+  nodeType: string
+  nodeLabel: string
+  status: RPARunStatus
+  attempt: number
+  outputJson: string
+  errorMessage: string
+  startedAt: string
+  finishedAt: string
 }
 
 export interface RPATemplate {

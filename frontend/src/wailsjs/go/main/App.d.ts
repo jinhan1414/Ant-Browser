@@ -168,6 +168,8 @@ export function RPAFlowImportXML(arg1:rpa.FlowXMLImportInput):Promise<rpa.Flow>;
 
 export function RPAFlowList(arg1:string,arg2:string):Promise<Array<rpa.Flow>>;
 
+export function RPAFlowNodeCatalog():Promise<rpa.FlowNodeCatalogPayload>;
+
 export function RPAFlowParseXML(arg1:rpa.FlowXMLImportInput):Promise<rpa.Flow>;
 
 export function RPAFlowSave(arg1:rpa.Flow):Promise<rpa.Flow>;
@@ -175,6 +177,8 @@ export function RPAFlowSave(arg1:rpa.Flow):Promise<rpa.Flow>;
 export function RPAFlowShare(arg1:string):Promise<string>;
 
 export function RPARunList():Promise<Array<rpa.Run>>;
+
+export function RPARunStepList(arg1:string):Promise<Array<rpa.RunStep>>;
 
 export function RPARunTargetList(arg1:string):Promise<Array<rpa.RunTarget>>;
 
