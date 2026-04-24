@@ -654,6 +654,8 @@ export namespace rpa {
 	    edgeId: string;
 	    sourceNodeId: string;
 	    targetNodeId: string;
+	    label: string;
+	    branchType: string;
 	    condition: string;
 	
 	    static createFrom(source: any = {}) {
@@ -665,6 +667,8 @@ export namespace rpa {
 	        this.edgeId = source["edgeId"];
 	        this.sourceNodeId = source["sourceNodeId"];
 	        this.targetNodeId = source["targetNodeId"];
+	        this.label = source["label"];
+	        this.branchType = source["branchType"];
 	        this.condition = source["condition"];
 	    }
 	}
@@ -877,6 +881,131 @@ export namespace rpa {
 	    }
 	}
 	
+	export class FlowNodeField {
+	    key: string;
+	    label: string;
+	    kind: string;
+	    storage: string;
+	    required: boolean;
+	    hint: string;
+	    placeholder: string;
+	    xmlAttr: string;
+	    promptSample: string;
+	    defaultValue: any;
+	    minValue: number;
+	    multiline: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowNodeField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	        this.kind = source["kind"];
+	        this.storage = source["storage"];
+	        this.required = source["required"];
+	        this.hint = source["hint"];
+	        this.placeholder = source["placeholder"];
+	        this.xmlAttr = source["xmlAttr"];
+	        this.promptSample = source["promptSample"];
+	        this.defaultValue = source["defaultValue"];
+	        this.minValue = source["minValue"];
+	        this.multiline = source["multiline"];
+	    }
+	}
+	export class FlowNodeCatalogItem {
+	    nodeType: string;
+	    label: string;
+	    category: string;
+	    description: string;
+	    palette: boolean;
+	    fixed: boolean;
+	    xmlSupported: boolean;
+	    promptEnabled: boolean;
+	    runtimeSupported: boolean;
+	    allowIncoming: boolean;
+	    allowOutgoing: boolean;
+	    maxOutgoing: number;
+	    supportsIfBranch: boolean;
+	    supportsOnError: boolean;
+	    fields: FlowNodeField[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowNodeCatalogItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeType = source["nodeType"];
+	        this.label = source["label"];
+	        this.category = source["category"];
+	        this.description = source["description"];
+	        this.palette = source["palette"];
+	        this.fixed = source["fixed"];
+	        this.xmlSupported = source["xmlSupported"];
+	        this.promptEnabled = source["promptEnabled"];
+	        this.runtimeSupported = source["runtimeSupported"];
+	        this.allowIncoming = source["allowIncoming"];
+	        this.allowOutgoing = source["allowOutgoing"];
+	        this.maxOutgoing = source["maxOutgoing"];
+	        this.supportsIfBranch = source["supportsIfBranch"];
+	        this.supportsOnError = source["supportsOnError"];
+	        this.fields = this.convertValues(source["fields"], FlowNodeField);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FlowNodeCatalogPayload {
+	    items: FlowNodeCatalogItem[];
+	    xmlPromptTemplate: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowNodeCatalogPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], FlowNodeCatalogItem);
+	        this.xmlPromptTemplate = source["xmlPromptTemplate"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	
 	
 	
@@ -922,6 +1051,42 @@ export namespace rpa {
 	        this.startedAt = source["startedAt"];
 	        this.finishedAt = source["finishedAt"];
 	        this.errorMessage = source["errorMessage"];
+	    }
+	}
+	export class RunStep {
+	    runStepId: string;
+	    runId: string;
+	    runTargetId: string;
+	    profileId: string;
+	    nodeId: string;
+	    nodeType: string;
+	    nodeLabel: string;
+	    status: string;
+	    attempt: number;
+	    outputJson: string;
+	    errorMessage: string;
+	    startedAt: string;
+	    finishedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.runStepId = source["runStepId"];
+	        this.runId = source["runId"];
+	        this.runTargetId = source["runTargetId"];
+	        this.profileId = source["profileId"];
+	        this.nodeId = source["nodeId"];
+	        this.nodeType = source["nodeType"];
+	        this.nodeLabel = source["nodeLabel"];
+	        this.status = source["status"];
+	        this.attempt = source["attempt"];
+	        this.outputJson = source["outputJson"];
+	        this.errorMessage = source["errorMessage"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
 	    }
 	}
 	export class RunTarget {

@@ -12,12 +12,20 @@ const (
 type FlowNodeType string
 
 const (
-	NodeTypeStart          FlowNodeType = "start"
-	NodeTypeEnd            FlowNodeType = "end"
-	NodeTypeBrowserStart   FlowNodeType = "browser.start"
-	NodeTypeBrowserOpenURL FlowNodeType = "browser.open_url"
-	NodeTypeDelay          FlowNodeType = "delay"
-	NodeTypeBrowserStop    FlowNodeType = "browser.stop"
+	NodeTypeStart           FlowNodeType = "start"
+	NodeTypeEnd             FlowNodeType = "end"
+	NodeTypeBrowserStart    FlowNodeType = "browser.start"
+	NodeTypeBrowserOpenURL  FlowNodeType = "browser.open_url"
+	NodeTypeBrowserClick    FlowNodeType = "browser.click"
+	NodeTypeBrowserInput    FlowNodeType = "browser.input"
+	NodeTypeBrowserReadText FlowNodeType = "browser.read_text"
+	NodeTypeDelay           FlowNodeType = "delay"
+	NodeTypeBrowserStop     FlowNodeType = "browser.stop"
+	NodeTypeConditionIf     FlowNodeType = "control.if"
+	NodeTypeRetry           FlowNodeType = "control.retry"
+	NodeTypeParallel        FlowNodeType = "control.parallel"
+	NodeTypeFail            FlowNodeType = "control.fail"
+	NodeTypeSystemNotify    FlowNodeType = "system.notify"
 )
 
 type FlowXMLImportInput struct {
@@ -45,11 +53,22 @@ type FlowNode struct {
 	Config   map[string]any `json:"config"`
 }
 
+type FlowEdgeBranchType string
+
+const (
+	FlowEdgeBranchDefault FlowEdgeBranchType = "default"
+	FlowEdgeBranchTrue    FlowEdgeBranchType = "true"
+	FlowEdgeBranchFalse   FlowEdgeBranchType = "false"
+	FlowEdgeBranchOnError FlowEdgeBranchType = "on_error"
+)
+
 type FlowEdge struct {
-	EdgeID       string `json:"edgeId"`
-	SourceNodeID string `json:"sourceNodeId"`
-	TargetNodeID string `json:"targetNodeId"`
-	Condition    string `json:"condition"`
+	EdgeID       string             `json:"edgeId"`
+	SourceNodeID string             `json:"sourceNodeId"`
+	TargetNodeID string             `json:"targetNodeId"`
+	Label        string             `json:"label"`
+	BranchType   FlowEdgeBranchType `json:"branchType"`
+	Condition    string             `json:"condition"`
 }
 
 type FlowDocument struct {
@@ -130,10 +149,7 @@ func normalizeDocument(document FlowDocument) FlowDocument {
 		}
 	}
 	for idx := range document.Edges {
-		document.Edges[idx].EdgeID = strings.TrimSpace(document.Edges[idx].EdgeID)
-		document.Edges[idx].SourceNodeID = strings.TrimSpace(document.Edges[idx].SourceNodeID)
-		document.Edges[idx].TargetNodeID = strings.TrimSpace(document.Edges[idx].TargetNodeID)
-		document.Edges[idx].Condition = strings.TrimSpace(document.Edges[idx].Condition)
+		document.Edges[idx] = normalizeFlowEdge(document.Edges[idx])
 	}
 	return document
 }

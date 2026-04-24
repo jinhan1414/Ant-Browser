@@ -9,7 +9,7 @@ import (
 )
 
 type rpaExecutionEngine interface {
-	Execute(task *rpa.Task, flow *rpa.Flow, targets []rpa.TaskTarget) (*rpa.Run, []*rpa.RunTarget, error)
+	Execute(task *rpa.Task, flow *rpa.Flow, targets []rpa.TaskTarget) (*rpa.Run, []*rpa.RunTarget, []*rpa.RunStep, error)
 }
 
 type appRPAOperator struct {
@@ -112,6 +112,11 @@ func (a *App) RPAFlowEncodeXML(flow rpa.Flow) (string, error) {
 	return rpa.EncodeFlowXML(&flow)
 }
 
+func (a *App) RPAFlowNodeCatalog() (*rpa.FlowNodeCatalogPayload, error) {
+	payload := rpa.BuildFlowNodeCatalogPayload()
+	return &payload, nil
+}
+
 func (a *App) RPATaskSave(task rpa.Task, targets []rpa.TaskTarget) (*rpa.Task, error) {
 	if a.rpaSvc == nil {
 		return nil, fmt.Errorf("rpa service not initialized")
@@ -165,7 +170,7 @@ func (a *App) executeRPATask(taskID string, triggerType rpa.RunTriggerType) (*rp
 		return nil, err
 	}
 
-	run, runTargets, execErr := a.rpaExecutor.Execute(task, flow, derefTaskTargets(targets))
+	run, runTargets, runSteps, execErr := a.rpaExecutor.Execute(task, flow, derefTaskTargets(targets))
 	if run == nil {
 		return nil, fmt.Errorf("rpa executor returned nil run")
 	}
@@ -177,7 +182,7 @@ func (a *App) executeRPATask(taskID string, triggerType rpa.RunTriggerType) (*rp
 	if _, err = a.rpaSvc.SaveTask(task, derefTaskTargets(targets)); err != nil {
 		return nil, err
 	}
-	if err = a.rpaSvc.SaveRun(run, runTargets); err != nil {
+	if err = a.rpaSvc.SaveRun(run, runTargets, runSteps); err != nil {
 		return nil, err
 	}
 	if execErr != nil {
@@ -198,6 +203,13 @@ func (a *App) RPARunTargetList(runID string) ([]*rpa.RunTarget, error) {
 		return nil, fmt.Errorf("rpa service not initialized")
 	}
 	return a.rpaSvc.ListRunTargets(runID)
+}
+
+func (a *App) RPARunStepList(runID string) ([]*rpa.RunStep, error) {
+	if a.rpaSvc == nil {
+		return nil, fmt.Errorf("rpa service not initialized")
+	}
+	return a.rpaSvc.ListRunSteps(runID)
 }
 
 func (a *App) RPATemplateSave(template rpa.Template) (*rpa.Template, error) {

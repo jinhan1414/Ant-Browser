@@ -2,19 +2,26 @@ package rpa
 
 import "fmt"
 
-func BuildExecutionPlan(document FlowDocument) ([]FlowNode, error) {
+type CompiledEdge struct {
+	TargetNodeID string `json:"targetNodeId"`
+	Condition    string `json:"condition"`
+}
+
+type CompiledNode struct {
+	Node    FlowNode       `json:"node"`
+	Next    []CompiledEdge `json:"next"`
+	OnError []CompiledEdge `json:"onError"`
+}
+
+type ExecutionPlan struct {
+	EntryNodeID string                  `json:"entryNodeId"`
+	Nodes       map[string]CompiledNode `json:"nodes"`
+}
+
+func BuildExecutionPlan(document FlowDocument) (*ExecutionPlan, error) {
 	document = normalizeDocument(document)
 	if err := ValidateFlowDocument(document); err != nil {
 		return nil, err
-	}
-
-	nodeByID := make(map[string]FlowNode, len(document.Nodes))
-	outgoing := make(map[string][]FlowEdge, len(document.Nodes))
-	for _, node := range document.Nodes {
-		nodeByID[node.NodeID] = node
-	}
-	for _, edge := range document.Edges {
-		outgoing[edge.SourceNodeID] = append(outgoing[edge.SourceNodeID], edge)
 	}
 
 	startNode, err := findStartNode(document.Nodes)
@@ -22,33 +29,31 @@ func BuildExecutionPlan(document FlowDocument) ([]FlowNode, error) {
 		return nil, err
 	}
 
-	plan := make([]FlowNode, 0, len(document.Nodes))
-	visited := map[string]bool{}
-	current := startNode
-	for {
-		if visited[current.NodeID] {
-			return nil, fmt.Errorf("流程包含循环，当前版本暂不支持")
-		}
-		visited[current.NodeID] = true
-		plan = append(plan, current)
-		if current.NodeType == NodeTypeEnd {
-			return plan, nil
-		}
-
-		nextEdges := outgoing[current.NodeID]
-		if len(nextEdges) == 0 {
-			return nil, fmt.Errorf("节点 %s 缺少后续连线", current.NodeID)
-		}
-		if len(nextEdges) > 1 {
-			return nil, fmt.Errorf("节点 %s 存在分支，当前版本暂不支持", current.NodeID)
-		}
-
-		nextNode, ok := nodeByID[nextEdges[0].TargetNodeID]
-		if !ok {
-			return nil, fmt.Errorf("连线目标节点不存在: %s", nextEdges[0].TargetNodeID)
-		}
-		current = nextNode
+	plan := &ExecutionPlan{
+		EntryNodeID: startNode.NodeID,
+		Nodes:       make(map[string]CompiledNode, len(document.Nodes)),
 	}
+	for _, node := range document.Nodes {
+		plan.Nodes[node.NodeID] = CompiledNode{
+			Node:    node,
+			Next:    []CompiledEdge{},
+			OnError: []CompiledEdge{},
+		}
+	}
+	for _, edge := range document.Edges {
+		node := plan.Nodes[edge.SourceNodeID]
+		compiled := CompiledEdge{
+			TargetNodeID: edge.TargetNodeID,
+			Condition:    edge.Condition,
+		}
+		if edge.BranchType == FlowEdgeBranchOnError {
+			node.OnError = append(node.OnError, compiled)
+		} else {
+			node.Next = append(node.Next, compiled)
+		}
+		plan.Nodes[edge.SourceNodeID] = node
+	}
+	return plan, nil
 }
 
 func ValidateFlowDocument(document FlowDocument) error {
@@ -77,6 +82,8 @@ func ValidateFlowDocument(document FlowDocument) error {
 	if endCount == 0 {
 		return fmt.Errorf("流程至少需要一个结束节点")
 	}
+
+	seenEdges := map[string]bool{}
 	for _, edge := range document.Edges {
 		if edge.SourceNodeID == "" || edge.TargetNodeID == "" {
 			return fmt.Errorf("连线起点和终点不能为空")
@@ -87,6 +94,17 @@ func ValidateFlowDocument(document FlowDocument) error {
 		if _, ok := nodeByID[edge.TargetNodeID]; !ok {
 			return fmt.Errorf("连线终点不存在: %s", edge.TargetNodeID)
 		}
+		key := edge.SourceNodeID + "|" + edge.TargetNodeID + "|" + edge.Condition
+		if seenEdges[key] {
+			return fmt.Errorf("重复连线: %s", key)
+		}
+		seenEdges[key] = true
+	}
+	if err := validateRequiredNodeFields(document, nodeByID); err != nil {
+		return err
+	}
+	if err := validateEdgeSemantics(document, nodeByID); err != nil {
+		return err
 	}
 	return nil
 }

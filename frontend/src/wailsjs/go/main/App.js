@@ -322,6 +322,10 @@ export function RPAFlowList(arg1, arg2) {
   return window['go']['main']['App']['RPAFlowList'](arg1, arg2);
 }
 
+export function RPAFlowNodeCatalog() {
+  return window['go']['main']['App']['RPAFlowNodeCatalog']();
+}
+
 export function RPAFlowParseXML(arg1) {
   return window['go']['main']['App']['RPAFlowParseXML'](arg1);
 }
@@ -336,6 +340,10 @@ export function RPAFlowShare(arg1) {
 
 export function RPARunList() {
   return window['go']['main']['App']['RPARunList']();
+}
+
+export function RPARunStepList(arg1) {
+  return window['go']['main']['App']['RPARunStepList'](arg1);
 }
 
 export function RPARunTargetList(arg1) {

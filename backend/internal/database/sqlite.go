@@ -223,6 +223,29 @@ var migrations = []migration{
 			`ALTER TABLE rpa_flows ADD COLUMN source_xml TEXT NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		version: 9,
+		desc:    "新增 RPA 运行步骤明细表",
+		stmts: []string{
+			`CREATE TABLE IF NOT EXISTS rpa_run_steps (
+				run_step_id    TEXT PRIMARY KEY,
+				run_id         TEXT NOT NULL,
+				run_target_id  TEXT NOT NULL DEFAULT '',
+				profile_id     TEXT NOT NULL DEFAULT '',
+				node_id        TEXT NOT NULL DEFAULT '',
+				node_type      TEXT NOT NULL DEFAULT '',
+				node_label     TEXT NOT NULL DEFAULT '',
+				status         TEXT NOT NULL DEFAULT 'pending',
+				attempt        INTEGER NOT NULL DEFAULT 1,
+				output_json    TEXT NOT NULL DEFAULT '',
+				error_message  TEXT NOT NULL DEFAULT '',
+				started_at     TEXT NOT NULL DEFAULT '',
+				finished_at    TEXT NOT NULL DEFAULT ''
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_run_steps_run_id ON rpa_run_steps(run_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_rpa_run_steps_target_id ON rpa_run_steps(run_target_id)`,
+		},
+	},
 	// ── 新版本在此追加，格式：
 	// {
 	//     version: 4,

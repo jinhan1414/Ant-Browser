@@ -1,22 +1,46 @@
-import { Button, FormItem, Input, Select } from '../../../shared/components'
-import type { RPAFlowNode, RPAFlowNodeType } from '../types'
-
-const NODE_TYPE_OPTIONS: { value: RPAFlowNodeType; label: string }[] = [
-  { value: 'start', label: '开始' },
-  { value: 'end', label: '结束' },
-  { value: 'browser.start', label: '启动浏览器' },
-  { value: 'browser.open_url', label: '打开页面' },
-  { value: 'delay', label: '等待' },
-  { value: 'browser.stop', label: '关闭浏览器' },
-]
+import type { ChangeEvent } from 'react'
+import { Button, FormItem, Input, Select, Textarea } from '../../../shared/components'
+import { buildNodeConfig, findNodeCatalogItem, getNodeLabel, getNodeTypeOptions, readNodeFieldValue, writeNodeFieldValue } from '../nodeCatalog'
+import type { RPAFlowNode, RPAFlowNodeCatalogItem, RPAFlowNodeField, RPAFlowNodeType } from '../types'
 
 interface FlowNodeInspectorProps {
+  catalog: RPAFlowNodeCatalogItem[]
   node: RPAFlowNode | null
   onChange: (node: RPAFlowNode) => void
   onDelete: (nodeId: string) => void
 }
 
-export function FlowNodeInspector({ node, onChange, onDelete }: FlowNodeInspectorProps) {
+function shouldReplaceNodeLabel(node: RPAFlowNode, catalog: RPAFlowNodeCatalogItem[]) {
+  const current = findNodeCatalogItem(catalog, node.nodeType)
+  return !node.label || node.label === current?.label || node.label === node.nodeType
+}
+
+function renderField(
+  node: RPAFlowNode,
+  field: RPAFlowNodeField,
+  onChange: (nextNode: RPAFlowNode) => void,
+) {
+  const commonProps = {
+    value: readNodeFieldValue(node.config || {}, field),
+    placeholder: field.placeholder || undefined,
+    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange({
+      ...node,
+      config: writeNodeFieldValue(node.config || {}, field, e.target.value),
+    }),
+  }
+
+  return (
+    <FormItem key={field.key} label={field.label} required={field.required} hint={field.hint || undefined}>
+      {field.multiline ? (
+        <Textarea rows={3} {...commonProps} />
+      ) : (
+        <Input type={field.kind === 'number' ? 'number' : 'text'} min={field.kind === 'number' ? field.minValue : undefined} {...commonProps} />
+      )}
+    </FormItem>
+  )
+}
+
+export function FlowNodeInspector({ catalog, node, onChange, onDelete }: FlowNodeInspectorProps) {
   if (!node) {
     return (
       <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-secondary)]/40 p-4 text-sm text-[var(--color-text-muted)]">
@@ -25,15 +49,8 @@ export function FlowNodeInspector({ node, onChange, onDelete }: FlowNodeInspecto
     )
   }
 
-  const updateConfig = (patch: Record<string, any>) => {
-    onChange({
-      ...node,
-      config: {
-        ...node.config,
-        ...patch,
-      },
-    })
-  }
+  const item = findNodeCatalogItem(catalog, node.nodeType)
+  const isFixedNode = item?.fixed ?? (node.nodeType === 'start' || node.nodeType === 'end')
 
   return (
     <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-secondary)]/40 p-4 space-y-4">
@@ -47,27 +64,21 @@ export function FlowNodeInspector({ node, onChange, onDelete }: FlowNodeInspecto
       <FormItem label="节点类型">
         <Select
           value={node.nodeType}
-          disabled={node.nodeType === 'start' || node.nodeType === 'end'}
-          options={NODE_TYPE_OPTIONS}
-          onChange={e => onChange({ ...node, nodeType: e.target.value as RPAFlowNodeType })}
+          disabled={isFixedNode}
+          options={getNodeTypeOptions(catalog)}
+          onChange={e => {
+            const nextType = e.target.value as RPAFlowNodeType
+            onChange({
+              ...node,
+              nodeType: nextType,
+              label: shouldReplaceNodeLabel(node, catalog) ? getNodeLabel(catalog, nextType) : node.label,
+              config: buildNodeConfig(catalog, nextType, node.config || {}),
+            })
+          }}
         />
       </FormItem>
-      {node.nodeType === 'browser.open_url' && (
-        <FormItem label="页面地址" required>
-          <Input value={String(node.config.url || '')} onChange={e => updateConfig({ url: e.target.value })} placeholder="https://example.com" />
-        </FormItem>
-      )}
-      {node.nodeType === 'browser.start' && (
-        <FormItem label="启动地址" hint="多个地址用换行分隔时，先填写第一个常用入口">
-          <Input value={String((node.config.startUrls && node.config.startUrls[0]) || '')} onChange={e => updateConfig({ startUrls: e.target.value ? [e.target.value] : [] })} placeholder="https://example.com" />
-        </FormItem>
-      )}
-      {node.nodeType === 'delay' && (
-        <FormItem label="等待毫秒">
-          <Input type="number" min={1} value={String(node.config.durationMs || 1000)} onChange={e => updateConfig({ durationMs: Number(e.target.value) || 1000 })} />
-        </FormItem>
-      )}
-      {node.nodeType !== 'start' && node.nodeType !== 'end' && (
+      {(item?.fields || []).map(field => renderField(node, field, onChange))}
+      {!isFixedNode && (
         <Button variant="danger" size="sm" onClick={() => onDelete(node.nodeId)}>
           删除节点
         </Button>

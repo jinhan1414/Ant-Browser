@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestAppRPAFlowTaskAndRunLifecycle(t *testing.T) {
 			"cron":     "0 9 * * *",
 			"timezone": "Asia/Shanghai",
 		},
-		Enabled:        true,
+		Enabled: true,
 	}, []rpa.TaskTarget{
 		{ProfileID: "profile-a"},
 		{ProfileID: "profile-b"},
@@ -81,6 +82,14 @@ func TestAppRPAFlowTaskAndRunLifecycle(t *testing.T) {
 	}
 	if len(runTargets) != 2 {
 		t.Fatalf("期望 2 条运行目标，实际 %d", len(runTargets))
+	}
+
+	runSteps, err := app.RPARunStepList(run.RunID)
+	if err != nil {
+		t.Fatalf("查询运行步骤失败: %v", err)
+	}
+	if len(runSteps) != 2 {
+		t.Fatalf("期望 2 条运行步骤，实际 %d", len(runSteps))
 	}
 }
 
@@ -140,6 +149,21 @@ func TestAppRPAParseAndEncodeFlowXML(t *testing.T) {
 	}
 }
 
+func TestAppRPAFlowNodeCatalog(t *testing.T) {
+	app := newTestRPAApp(t)
+
+	payload, err := app.RPAFlowNodeCatalog()
+	if err != nil {
+		t.Fatalf("查询节点目录失败: %v", err)
+	}
+	if payload == nil || len(payload.Items) == 0 {
+		t.Fatalf("节点目录为空: %+v", payload)
+	}
+	if payload.XMLPromptTemplate == "" {
+		t.Fatal("AI 提示词为空")
+	}
+}
+
 func TestAppExecuteScheduledTaskSetsScheduledTrigger(t *testing.T) {
 	app := newTestRPAApp(t)
 
@@ -180,6 +204,34 @@ func TestAppExecuteScheduledTaskSetsScheduledTrigger(t *testing.T) {
 	}
 }
 
+func TestAppEventNotifier_EmitsRuntimeEvent(t *testing.T) {
+	emitter := &runtimeEmitterStub{}
+	notifier := &appEventNotifier{
+		ctx:     context.Background(),
+		appName: "Ant Browser",
+		emit:    emitter.Emit,
+	}
+
+	err := notifier.Notify("Google 账号异常", "实例 profile-a 状态：需要验证")
+	if err != nil {
+		t.Fatalf("发送事件通知失败: %v", err)
+	}
+	if len(emitter.events) != 1 {
+		t.Fatalf("事件数错误: %+v", emitter.events)
+	}
+	event := emitter.events[0]
+	if event.Name != systemNotificationEventName {
+		t.Fatalf("事件名错误: %+v", event)
+	}
+	payload, ok := event.Data[0].(systemNotificationPayload)
+	if !ok {
+		t.Fatalf("事件载荷类型错误: %+v", event.Data)
+	}
+	if payload.Title != "Google 账号异常" || payload.Body != "实例 profile-a 状态：需要验证" || payload.AppName != "Ant Browser" {
+		t.Fatalf("事件载荷错误: %+v", payload)
+	}
+}
+
 func newTestRPAApp(t *testing.T) *App {
 	t.Helper()
 
@@ -209,7 +261,20 @@ func newTestRPAApp(t *testing.T) *App {
 
 type rpaExecutorStub struct{}
 
-func (s *rpaExecutorStub) Execute(task *rpa.Task, flow *rpa.Flow, targets []rpa.TaskTarget) (*rpa.Run, []*rpa.RunTarget, error) {
+type emittedEvent struct {
+	Name string
+	Data []any
+}
+
+type runtimeEmitterStub struct {
+	events []emittedEvent
+}
+
+func (s *runtimeEmitterStub) Emit(_ context.Context, eventName string, data ...interface{}) {
+	s.events = append(s.events, emittedEvent{Name: eventName, Data: data})
+}
+
+func (s *rpaExecutorStub) Execute(task *rpa.Task, flow *rpa.Flow, targets []rpa.TaskTarget) (*rpa.Run, []*rpa.RunTarget, []*rpa.RunStep, error) {
 	run := &rpa.Run{
 		TaskID:      task.TaskID,
 		FlowID:      flow.FlowID,
@@ -220,8 +285,11 @@ func (s *rpaExecutorStub) Execute(task *rpa.Task, flow *rpa.Flow, targets []rpa.
 		FinishedAt:  "2026-04-15T10:00:02Z",
 	}
 	items := make([]*rpa.RunTarget, 0, len(targets))
+	steps := make([]*rpa.RunStep, 0, len(targets))
 	for _, target := range targets {
+		runTargetID := target.ProfileID + "-target"
 		items = append(items, &rpa.RunTarget{
+			RunTargetID: runTargetID,
 			ProfileID:   target.ProfileID,
 			ProfileName: target.ProfileID,
 			Status:      rpa.RunStatusSuccess,
@@ -230,6 +298,18 @@ func (s *rpaExecutorStub) Execute(task *rpa.Task, flow *rpa.Flow, targets []rpa.
 			FinishedAt:  "2026-04-15T10:00:01Z",
 			DebugPort:   9222,
 		})
+		steps = append(steps, &rpa.RunStep{
+			RunTargetID: runTargetID,
+			ProfileID:   target.ProfileID,
+			NodeID:      "open_1",
+			NodeType:    string(rpa.NodeTypeBrowserOpenURL),
+			NodeLabel:   "打开页面",
+			Status:      rpa.RunStatusSuccess,
+			Attempt:     1,
+			OutputJSON:  `{"url":"https://example.com"}`,
+			StartedAt:   "2026-04-15T10:00:00Z",
+			FinishedAt:  "2026-04-15T10:00:01Z",
+		})
 	}
-	return run, items, nil
+	return run, items, steps, nil
 }

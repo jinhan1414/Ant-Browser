@@ -1,8 +1,10 @@
 import type {
   RPAFlow,
+  RPAFlowNodeCatalogPayload,
   RPAFlowGroup,
   RPAFlowXMLImportInput,
   RPARun,
+  RPARunStep,
   RPARunTarget,
   RPATask,
   RPATaskTarget,
@@ -80,6 +82,11 @@ export async function encodeRPAFlowXML(flow: RPAFlow): Promise<string> {
   return (await app?.RPAFlowEncodeXML?.(flow)) || ''
 }
 
+export async function fetchRPAFlowNodeCatalog(): Promise<RPAFlowNodeCatalogPayload | null> {
+  const app = await getRPAAppBinding()
+  return (await app?.RPAFlowNodeCatalog?.()) || null
+}
+
 export async function fetchRPATasks(): Promise<RPATask[]> {
   const app = await getRPAAppBinding()
   return (await app?.RPATaskList?.()) || []
@@ -126,6 +133,11 @@ export async function fetchRPARuns(): Promise<RPARun[]> {
 export async function fetchRPARunTargets(runId: string): Promise<RPARunTarget[]> {
   const app = await getRPAAppBinding()
   return (await app?.RPARunTargetList?.(runId)) || []
+}
+
+export async function fetchRPARunSteps(runId: string): Promise<RPARunStep[]> {
+  const app = await getRPAAppBinding()
+  return (await app?.RPARunStepList?.(runId)) || []
 }
 
 export async function fetchRPATemplates(): Promise<RPATemplate[]> {

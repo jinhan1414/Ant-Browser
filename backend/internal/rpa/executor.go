@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"ant-chrome/backend/internal/browser"
+
+	"github.com/google/uuid"
 )
 
 type BrowserOperator interface {
@@ -13,77 +15,84 @@ type BrowserOperator interface {
 	Stop(profileID string) (*browser.Profile, error)
 }
 
+type AutomationSession interface {
+	QuerySelector(selector string) (string, error)
+	WaitVisible(selector string, timeoutMs int) error
+	Click(selector string) error
+	InputText(selector string, value string) error
+	ReadText(selector string) (string, error)
+	ReadURL() (string, error)
+	Close() error
+}
+
+type AutomationSessionFactory func(debugPort int) (AutomationSession, error)
+
 type Executor struct {
-	operator BrowserOperator
+	operator       BrowserOperator
+	sessionFactory AutomationSessionFactory
+	notifier       Notifier
 }
 
 func NewExecutor(operator BrowserOperator) *Executor {
-	return &Executor{operator: operator}
+	return NewExecutorWithDeps(operator, defaultAutomationSessionFactory, NewUnsupportedNotifier())
 }
 
-func (e *Executor) Execute(task *Task, flow *Flow, targets []TaskTarget) (*Run, []*RunTarget, error) {
-	run := &Run{
-		TaskID:      task.TaskID,
-		FlowID:      flow.FlowID,
-		TriggerType: RunTriggerManual,
-		Status:      RunStatusRunning,
-		Summary:     "执行中",
-		StartedAt:   time.Now().Format(time.RFC3339),
+func NewExecutorWithDeps(operator BrowserOperator, sessionFactory AutomationSessionFactory, notifier Notifier) *Executor {
+	if sessionFactory == nil {
+		sessionFactory = defaultAutomationSessionFactory
 	}
-	ordered := orderTargets(task.ExecutionOrder, targets)
+	if notifier == nil {
+		notifier = NewUnsupportedNotifier()
+	}
+	return &Executor{operator: operator, sessionFactory: sessionFactory, notifier: notifier}
+}
+
+func (e *Executor) Execute(task *Task, flow *Flow, targets []TaskTarget) (*Run, []*RunTarget, []*RunStep, error) {
+	run := newRun(task, flow)
 	plan, err := BuildExecutionPlan(flow.Document)
 	if err != nil {
-		run.Status = RunStatusFailed
-		run.Summary = "执行失败"
-		run.ErrorMessage = err.Error()
-		run.FinishedAt = time.Now().Format(time.RFC3339)
-		return run, nil, err
+		return failRun(run, err), nil, nil, err
 	}
-	runTargets := make([]*RunTarget, 0, len(ordered))
-	for _, target := range ordered {
-		item := e.executeTarget(run.RunID, target, plan)
-		runTargets = append(runTargets, item)
-		if item.Status == RunStatusFailed {
-			run.Status = RunStatusFailed
-			run.Summary = "执行失败"
-			run.FinishedAt = time.Now().Format(time.RFC3339)
-			run.ErrorMessage = item.ErrorMessage
-			return run, runTargets, fmt.Errorf(item.ErrorMessage)
-		}
+	runTargets, runSteps, execErr := e.executeTargets(run, task, flow, plan, targets)
+	if execErr != nil {
+		return failRun(run, execErr), runTargets, runSteps, execErr
 	}
 	run.Status = RunStatusSuccess
 	run.Summary = "执行成功"
 	run.FinishedAt = time.Now().Format(time.RFC3339)
-	return run, runTargets, nil
+	return run, runTargets, runSteps, nil
 }
 
-func (e *Executor) executeTarget(runID string, target TaskTarget, plan []FlowNode) *RunTarget {
-	item := &RunTarget{
-		RunID:       runID,
-		ProfileID:   target.ProfileID,
-		ProfileName: target.ProfileID,
-		Status:      RunStatusRunning,
-		StartedAt:   time.Now().Format(time.RFC3339),
+func defaultAutomationSessionFactory(debugPort int) (AutomationSession, error) {
+	session, err := NewBrowserSession(NewCDPClientForDebugPort(debugPort))
+	if err != nil {
+		return nil, err
 	}
-	for idx, node := range plan {
-		item.StepIndex = idx + 1
-		profile, err := e.executeNode(target.ProfileID, node)
-		if profile != nil && profile.DebugPort > 0 {
-			item.DebugPort = profile.DebugPort
-			if profile.ProfileName != "" {
-				item.ProfileName = profile.ProfileName
-			}
-		}
-		if err != nil {
-			item.Status = RunStatusFailed
-			item.ErrorMessage = err.Error()
-			item.FinishedAt = time.Now().Format(time.RFC3339)
-			return item
-		}
+	if err := session.AttachPage(); err != nil {
+		return nil, err
 	}
-	item.Status = RunStatusSuccess
-	item.FinishedAt = time.Now().Format(time.RFC3339)
-	return item
+	return session, nil
+}
+
+func newRun(task *Task, flow *Flow) *Run {
+	return &Run{
+		RunID:        uuid.NewString(),
+		TaskID:       task.TaskID,
+		FlowID:       flow.FlowID,
+		TriggerType:  RunTriggerManual,
+		Status:       RunStatusRunning,
+		Summary:      "执行中",
+		StartedAt:    time.Now().Format(time.RFC3339),
+		ErrorMessage: "",
+	}
+}
+
+func failRun(run *Run, err error) *Run {
+	run.Status = RunStatusFailed
+	run.Summary = "执行失败"
+	run.ErrorMessage = err.Error()
+	run.FinishedAt = time.Now().Format(time.RFC3339)
+	return run
 }
 
 func orderTargets(order TaskExecutionOrder, targets []TaskTarget) []TaskTarget {
@@ -96,4 +105,8 @@ func orderTargets(order TaskExecutionOrder, targets []TaskTarget) []TaskTarget {
 		items[i], items[j] = items[j], items[i]
 	})
 	return items
+}
+
+func unsupportedNodeError(nodeType FlowNodeType) error {
+	return fmt.Errorf("不支持的 RPA 节点类型: %s", nodeType)
 }

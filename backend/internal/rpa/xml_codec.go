@@ -3,6 +3,7 @@ package rpa
 import (
 	"encoding/xml"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -23,11 +24,7 @@ type xmlVariable struct {
 
 type xmlNode struct {
 	XMLName  xml.Name
-	ID       string `xml:"id,attr"`
-	X        string `xml:"x,attr"`
-	Y        string `xml:"y,attr"`
-	URL      string `xml:"url,attr"`
-	Duration string `xml:"durationMs,attr"`
+	Attrs    []xml.Attr
 }
 
 type xmlNodes []xmlNode
@@ -41,21 +38,7 @@ func (n *xmlNodes) UnmarshalXML(decoder *xml.Decoder, start xml.StartElement) er
 		}
 		switch value := token.(type) {
 		case xml.StartElement:
-			node := xmlNode{XMLName: value.Name}
-			for _, attr := range value.Attr {
-				switch attr.Name.Local {
-				case "id":
-					node.ID = attr.Value
-				case "x":
-					node.X = attr.Value
-				case "y":
-					node.Y = attr.Value
-				case "url":
-					node.URL = attr.Value
-				case "durationMs":
-					node.Duration = attr.Value
-				}
-			}
+			node := xmlNode{XMLName: value.Name, Attrs: append([]xml.Attr{}, value.Attr...)}
 			if err := decoder.Skip(); err != nil {
 				return err
 			}
@@ -69,10 +52,25 @@ func (n *xmlNodes) UnmarshalXML(decoder *xml.Decoder, start xml.StartElement) er
 	}
 }
 
+func (n xmlNode) MarshalXML(encoder *xml.Encoder, _ xml.StartElement) error {
+	start := xml.StartElement{
+		Name: n.XMLName,
+		Attr: n.Attrs,
+	}
+	if err := encoder.EncodeToken(start); err != nil {
+		return err
+	}
+	if err := encoder.EncodeToken(start.End()); err != nil {
+		return err
+	}
+	return encoder.Flush()
+}
+
 type xmlEdge struct {
 	From      string `xml:"from,attr"`
 	To        string `xml:"to,attr"`
-	Condition string `xml:"condition,attr"`
+	Condition string `xml:"condition,attr,omitempty"`
+	Label     string `xml:"label,attr,omitempty"`
 }
 
 func ParseFlowXML(xmlText string) (*FlowDocument, string, error) {
@@ -110,7 +108,7 @@ func ParseFlowXML(xmlText string) (*FlowDocument, string, error) {
 			return nil, "", err
 		}
 		if node.Label == "" {
-			node.Label = defaultNodeLabel(node.NodeType)
+			node.Label = FlowNodeLabel(node.NodeType)
 		}
 		if node.NodeID == "" {
 			return nil, "", fmt.Errorf("节点 id 不能为空")
@@ -129,6 +127,7 @@ func ParseFlowXML(xmlText string) (*FlowDocument, string, error) {
 			EdgeID:       fmt.Sprintf("edge_%d", idx+1),
 			SourceNodeID: strings.TrimSpace(item.From),
 			TargetNodeID: strings.TrimSpace(item.To),
+			Label:        strings.TrimSpace(item.Label),
 			Condition:    strings.TrimSpace(item.Condition),
 		})
 	}
@@ -164,20 +163,17 @@ func EncodeFlowXML(flow *Flow) (string, error) {
 		})
 	}
 	for _, node := range document.Nodes {
-		durationMs, _ := numberConfig(node.Config["durationMs"])
-		payload.Nodes = append(payload.Nodes, xmlNode{
-			XMLName:  xml.Name{Local: string(node.NodeType)},
-			ID:       node.NodeID,
-			X:        formatFloat(node.Position.X),
-			Y:        formatFloat(node.Position.Y),
-			URL:      stringConfig(node.Config["url"]),
-			Duration: formatFloat(durationMs),
-		})
+		encodedNode, err := encodeFlowNode(node)
+		if err != nil {
+			return "", err
+		}
+		payload.Nodes = append(payload.Nodes, encodedNode)
 	}
 	for _, edge := range document.Edges {
 		payload.Edges = append(payload.Edges, xmlEdge{
 			From:      edge.SourceNodeID,
 			To:        edge.TargetNodeID,
+			Label:     edge.Label,
 			Condition: edge.Condition,
 		})
 	}
@@ -191,50 +187,111 @@ func EncodeFlowXML(flow *Flow) (string, error) {
 
 func convertXMLNode(item xmlNode) (FlowNode, error) {
 	nodeType := FlowNodeType(strings.TrimSpace(item.XMLName.Local))
+	catalogItem, ok := FindFlowNodeCatalogItem(nodeType)
+	if !ok || !catalogItem.XMLSupported {
+		return FlowNode{}, fmt.Errorf("不支持的 XML 节点类型: %s", nodeType)
+	}
 	node := FlowNode{
-		NodeID:   strings.TrimSpace(item.ID),
+		NodeID:   strings.TrimSpace(item.attr("id")),
 		NodeType: nodeType,
-		Label:    defaultNodeLabel(nodeType),
-		Position: FlowPosition{X: parseFloat(item.X), Y: parseFloat(item.Y)},
+		Label:    FlowNodeLabel(nodeType),
+		Position: FlowPosition{X: parseFloat(item.attr("x")), Y: parseFloat(item.attr("y"))},
 		Config:   map[string]any{},
 	}
-	switch nodeType {
-	case NodeTypeStart, NodeTypeEnd, NodeTypeBrowserStop:
-		return node, nil
-	case NodeTypeBrowserOpenURL:
-		if strings.TrimSpace(item.URL) == "" {
-			return FlowNode{}, fmt.Errorf("browser.open_url 节点 url 不能为空")
+	for _, field := range catalogItem.Fields {
+		if field.XMLAttr == "" {
+			continue
 		}
-		node.Config["url"] = strings.TrimSpace(item.URL)
-		return node, nil
-	case NodeTypeDelay:
-		node.Config["durationMs"] = parseFloat(item.Duration)
-		return node, nil
-	case NodeTypeBrowserStart:
-		if strings.TrimSpace(item.URL) != "" {
-			node.Config["startUrls"] = []any{strings.TrimSpace(item.URL)}
+		raw := strings.TrimSpace(item.attr(field.XMLAttr))
+		if raw == "" {
+			if field.Required {
+				return FlowNode{}, fmt.Errorf("%s 节点 %s 不能为空", nodeType, field.XMLAttr)
+			}
+			continue
 		}
-		return node, nil
+		assignXMLFieldValue(node.Config, field, raw)
+	}
+	return node, nil
+}
+
+func encodeFlowNode(node FlowNode) (xmlNode, error) {
+	catalogItem, ok := FindFlowNodeCatalogItem(node.NodeType)
+	if !ok || !catalogItem.XMLSupported {
+		return xmlNode{}, fmt.Errorf("节点类型不支持 XML 编码: %s", node.NodeType)
+	}
+	attrMap := map[string]string{
+		"id": node.NodeID,
+		"x":  formatFloat(node.Position.X),
+		"y":  formatFloat(node.Position.Y),
+	}
+	for _, field := range catalogItem.Fields {
+		if field.XMLAttr == "" {
+			continue
+		}
+		value, ok := encodeXMLFieldValue(node.Config, field)
+		if !ok || value == "" {
+			continue
+		}
+		attrMap[field.XMLAttr] = value
+	}
+	attrs := make([]xml.Attr, 0, len(attrMap))
+	for _, name := range sortedAttrKeys(attrMap) {
+		if attrMap[name] == "" {
+			continue
+		}
+		attrs = append(attrs, xml.Attr{Name: xml.Name{Local: name}, Value: attrMap[name]})
+	}
+	return xmlNode{
+		XMLName: xml.Name{Local: string(node.NodeType)},
+		Attrs:   attrs,
+	}, nil
+}
+
+func (n xmlNode) attr(name string) string {
+	for _, attr := range n.Attrs {
+		if attr.Name.Local == name {
+			return attr.Value
+		}
+	}
+	return ""
+}
+
+func assignXMLFieldValue(config map[string]any, field FlowNodeField, raw string) {
+	switch field.Storage {
+	case FieldStorageNumber:
+		config[field.Key] = parseFloat(raw)
+	case FieldStorageStringListFirst:
+		config[field.Key] = []any{raw}
 	default:
-		return FlowNode{}, fmt.Errorf("不支持的 XML 节点类型: %s", nodeType)
+		config[field.Key] = raw
 	}
 }
 
-func defaultNodeLabel(nodeType FlowNodeType) string {
-	switch nodeType {
-	case NodeTypeStart:
-		return "开始"
-	case NodeTypeEnd:
-		return "结束"
-	case NodeTypeBrowserStart:
-		return "启动浏览器"
-	case NodeTypeBrowserOpenURL:
-		return "打开页面"
-	case NodeTypeDelay:
-		return "等待"
-	case NodeTypeBrowserStop:
-		return "关闭浏览器"
+func encodeXMLFieldValue(config map[string]any, field FlowNodeField) (string, bool) {
+	switch field.Storage {
+	case FieldStorageNumber:
+		value, ok := numberConfig(config[field.Key])
+		if !ok {
+			return "", false
+		}
+		return formatFloat(value), true
+	case FieldStorageStringListFirst:
+		values := stringSliceConfig(config[field.Key])
+		if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
+			return "", false
+		}
+		return strings.TrimSpace(values[0]), true
 	default:
-		return string(nodeType)
+		value := strings.TrimSpace(stringConfig(config[field.Key]))
+		return value, value != ""
 	}
+}
+
+func sortedAttrKeys(attrMap map[string]string) []string {
+	keys := make([]string, 0, len(attrMap))
+	for key := range attrMap {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

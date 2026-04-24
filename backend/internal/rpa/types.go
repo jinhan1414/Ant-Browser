@@ -123,6 +123,22 @@ type RunTarget struct {
 	DebugPort    int       `json:"debugPort"`
 }
 
+type RunStep struct {
+	RunStepID    string    `json:"runStepId"`
+	RunID        string    `json:"runId"`
+	RunTargetID  string    `json:"runTargetId"`
+	ProfileID    string    `json:"profileId"`
+	NodeID       string    `json:"nodeId"`
+	NodeType     string    `json:"nodeType"`
+	NodeLabel    string    `json:"nodeLabel"`
+	Status       RunStatus `json:"status"`
+	Attempt      int       `json:"attempt"`
+	OutputJSON   string    `json:"outputJson"`
+	ErrorMessage string    `json:"errorMessage"`
+	StartedAt    string    `json:"startedAt"`
+	FinishedAt   string    `json:"finishedAt"`
+}
+
 type Template struct {
 	TemplateID   string   `json:"templateId"`
 	TemplateName string   `json:"templateName"`
