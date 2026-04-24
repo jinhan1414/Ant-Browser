@@ -55,6 +55,7 @@ docs/
 DEPLOYMENT_GUIDE.md
 plan.md
 pic/
+.worktrees/
 
 # Runtime data
 data/*
